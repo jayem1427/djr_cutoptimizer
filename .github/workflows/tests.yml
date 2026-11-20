@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    defaults:
+      run:
+        working-directory: djr_cutoptimizer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: djr_cutoptimizer   # the tests import the add-in by its folder name
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install pytest
+      - run: python -m pytest
+      - run: node --test tests/web_optimizer.test.js
+      - run: python tools/build_release.py --check

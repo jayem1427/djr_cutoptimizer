@@ -1,0 +1,70 @@
+# CLAUDE.md: working on djr_cutoptimizer
+
+A Fusion add-in (Python) that opens the djr_cutcalculator page in a palette, fills it from the selected CAM operation, and optimizes feeds and speeds. The owner runs a LemonTart CNC mill on LinuxCNC (2.2 kW, 24,000 rpm, ER16), mostly cutting 6061. Read `README.md` for user-facing behaviour.
+
+## Where things live
+
+| What | Where |
+|---|---|
+| This repo | `jayem1427/djr_cutoptimizer`, branch `main`. The repo root **is** the add-in folder. |
+| Calculator source | `jayem1427/cutcalculator` (`index.html`, `optimizer.js`, its Node tests). `web/` here is a copy made by `tools/sync_web.py`. Never edit `web/` directly. |
+| Installed add-in | `%APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\djr_cutoptimizer\` |
+| Limit profiles | `%APPDATA%\djr_cutoptimizer\limit_profiles.json` (Mac: `~/Library/Application Support/djr_cutoptimizer/`) |
+| Material per setup | setup attribute group `djr_cutcalc`, name `material` |
+| Sibling add-in | `jayem1427/djr_batchpost`. This repo copies its layout, `lib/fusionAddInUtils` and release tooling. |
+
+**The folder must be named `djr_cutoptimizer`.** Fusion loads `<folder>/<folder>.py` and `<folder>.manifest`, and command IDs come from the folder name. The tests import the add-in as the package `djr_cutoptimizer` from the parent folder, so CI checks out into a folder of that name.
+
+## Code map
+
+```
+djr_cutoptimizer.py / .manifest / .svg   entry point (run/stop), metadata, icon
+config.py                                PLUGIN_VERSION, DEBUG
+commands/commands.py                     registers OptimizerCommand
+commands/optimizer/
+  config.py          command and palette IDs, CAM workspace/panel IDs, attribute names
+  palette_command.py toolbar button, palette, HTML bridge, read_selection, set_material (adsk)
+  cam_mapping.py     PURE: parameter names, unit parsing, supported strategies, payload
+  profiles.py        PURE: limit profiles JSON (atomic write)
+web/                 calculator page + optimizer.js (copied; see above)
+scripts/djr_dump_cam_params/  Fusion script that dumps every op/tool parameter
+tools/               build_release.py, release_install.md, sync_web.py
+tests/               test_addin.py (stdlib unittest with a fake adsk), web_optimizer.test.js (Node)
+```
+
+## Bridge
+
+- JS → Python: `adsk.fusionSendData(action, json)` → `palette.incomingFromHTML`; the handler sets `args.returnData`, which the JS receives as a Promise result.
+- Python → JS: `palette.sendInfoToHTML(action, json)` → `window.fusionJavaScriptHandler.handle(action, data)`.
+- Actions from the page: `ready`, `readSelection`, `getLimits`, `saveLimits`, `setMaterial`. To the page: `loadCut`, `fusionStatus`.
+- Python sends metric (mm, rpm, mm/min); the page switches to metric on load.
+- The page detects Fusion lazily (`hasFusion()` at init and again after 800 ms), because `window.adsk` may be injected late.
+
+## Testing
+
+```bash
+python -m pytest                        # or: python -m unittest discover -s tests -v
+node --test tests/web_optimizer.test.js
+python tools/build_release.py --check
+python tools/sync_web.py --check        # only with ../cutcalculator checked out
+```
+
+None of this replaces a real Fusion run. Be explicit about what was verified in Fusion versus only in tests.
+
+## Releasing
+
+1. Bump `"version"` in `djr_cutoptimizer.manifest` **and** `PLUGIN_VERSION` in `config.py`.
+2. Add `## vX.Y.Z — date` to `CHANGELOG.md`. Its body becomes the release notes, followed by `tools/release_install.md`.
+3. Push to `main`, then `git tag vX.Y.Z && git push origin vX.Y.Z`. `.github/workflows/release.yml` tests, builds `djr_cutoptimizer-vX.Y.Z.zip` and `djr_dump_cam_params-vX.Y.Z.zip`, and publishes the release. A tag that doesn't match the version fails on purpose.
+
+## Next work (from the original handoff)
+
+1. **Verify parameter names.** The owner runs `djr_dump_cam_params` on an adaptive, a 2D contour and a slot; commit the output to `docs/cam_params/`. Then fix `OP_NAMES`, `TOOL_NAMES` and `INTERNAL_TO_CALC` in `cam_mapping.py`. The feed and speed internal units are unverified; expression parsing is used first, so internal units only matter for expressions that reference other parameters.
+2. **v0.2 Apply:** write spindle speed and cutting feed (plus stepover/stepdown when ticked), then `cam.generateToolpath(op)`. Make it one undoable step if the API allows; otherwise snapshot the old expressions and offer Revert. Ramp, plunge and lead feeds are often expressions tied to the cutting feed; don't overwrite user-set expressions without asking. Refuse unsupported strategies (`cam_mapping.REFUSED`).
+3. **Later:** "Save as preset" into the tool library; "Optimize all in setup", possibly with djr_batchpost.
+
+## Model notes (don't relearn these)
+
+- Force slope near a whole flute pitch is one-sided: smooth just *below* m·pitch, full entry slope immediately above. `robustSlope` takes the worst within ±0.05 mm, and the optimizer snaps to `m·pitch − tol`.
+- With no max chip thickness, kc's chip-thinning reward pushes toward thick chips. The page warns about this.
+- Don't copy FSWizard's data or methods (EULA).

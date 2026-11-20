@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # "Run workflow" button: rebuild an existing tag's zips and notes without re-tagging.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)publish, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    defaults:
+      run:
+        working-directory: djr_cutoptimizer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          path: djr_cutoptimizer
+      - name: Use the latest install instructions
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          git fetch --depth=1 origin main
+          git show origin/main:tools/release_install.md > tools/release_install.md
+          git show origin/main:tools/build_release.py > tools/build_release.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install pytest
+      - run: python -m pytest
+      - run: node --test tests/web_optimizer.test.js
+      - name: Build zips
+        run: python tools/build_release.py --tag "${TAG}"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/*.zip --clobber
+            gh release edit "${TAG}" --notes-file dist/RELEASE_NOTES.md
+          else
+            gh release create "${TAG}" dist/*.zip \
+              --title "djr_cutoptimizer ${TAG}" \
+              --notes-file dist/RELEASE_NOTES.md
+          fi

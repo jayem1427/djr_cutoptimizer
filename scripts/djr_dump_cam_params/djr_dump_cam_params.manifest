@@ -1,0 +1,10 @@
+{
+	"autodeskProduct":	"Fusion",
+	"type":	"script",
+	"author":	"jayem1427",
+	"description":	{
+		"":	"List every CAM operation and tool parameter (name, expression, value) for the selected operations, so the cut optimizer add-in can use verified parameter names."
+	},
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}

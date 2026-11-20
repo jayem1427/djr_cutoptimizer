@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion",
+	"type":	"addin",
+	"author":	"jayem1427",
+	"description":	{
+		"":	"DJR Cut Optimizer: pick feeds, speeds, stepover and stepdown for the selected CAM operation by maximizing removal rate inside your force, force-slope and machine limits. Uses the djr_cutcalculator model (Sandvik-calibrated for aluminium)."
+	},
+	"version":	"0.1.0",
+	"runOnStartup":	true,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true,
+	"iconFilename":	"djr_cutoptimizer.svg"
+}
