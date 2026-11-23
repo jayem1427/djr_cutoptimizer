@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.1 — 2026-11-23
+
+### Fixed
+- On Windows the panel showed “This site can’t be reached” (`ERR_INVALID_URL`, `file:///C:/%5CUsers%5C…`). The page path is now passed to Fusion with forward slashes.
+
 ## v0.1.0 — 2026-11-20
 
 First release: read-only. Select an operation, open the optimizer, and get the stepover, depth, feed and speed that give the highest removal rate inside your limits.

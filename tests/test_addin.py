@@ -89,7 +89,7 @@ def _install_fake_adsk():
 _install_fake_adsk()
 
 from djr_cutoptimizer.commands.optimizer import cam_mapping, profiles  # noqa: E402
-from djr_cutoptimizer.commands.optimizer.palette_command import OptimizerCommand  # noqa: E402
+from djr_cutoptimizer.commands.optimizer.palette_command import OptimizerCommand, palette_url  # noqa: E402
 import sync_web  # noqa: E402
 
 
@@ -235,6 +235,18 @@ class ReadSelection(unittest.TestCase):
         bad = types.SimpleNamespace(objectType='adsk::cam::Operation', name='Bad', strategy='adaptive2d', tool=None)
         _State.selections = [bad]
         self.assertFalse(OptimizerCommand.read_selection()['ok'])
+
+
+class PaletteUrl(unittest.TestCase):
+    def test_windows_path_has_no_backslashes(self):
+        # v0.1.0 bug: Fusion showed ERR_INVALID_URL for file:///C:/%5CUsers%5C...
+        p = 'C:\\Users\\me\\AppData\\Roaming\\Autodesk\\Autodesk Fusion 360\\API\\AddIns\\djr_cutoptimizer\\web\\index.html'
+        self.assertEqual(palette_url(p),
+                         'C:/Users/me/AppData/Roaming/Autodesk/Autodesk Fusion 360/API/AddIns/djr_cutoptimizer/web/index.html')
+
+    def test_posix_path_unchanged(self):
+        p = '/Users/me/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/djr_cutoptimizer/web/index.html'
+        self.assertEqual(palette_url(p), p)
 
 
 class Profiles(unittest.TestCase):

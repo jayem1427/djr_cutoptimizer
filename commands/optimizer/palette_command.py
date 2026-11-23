@@ -25,6 +25,12 @@ _ICON_FOLDER = os.path.join(_HERE, 'resources', '')
 _HTML = os.path.join(os.path.dirname(os.path.dirname(_HERE)), 'web', 'index.html')
 
 
+def palette_url(path: str) -> str:
+    """The page path as Fusion's palette wants it. Fusion turns a Windows path with
+    backslashes into the invalid URL file:///C:/%5CUsers%5C..., so use forward slashes."""
+    return path.replace('\\', '/')
+
+
 def _safe(fn, default=None):
     try:
         return fn()
@@ -100,7 +106,7 @@ class OptimizerCommand:
         ui = adsk.core.Application.get().userInterface
         palette = ui.palettes.itemById(config.PALETTE_ID)
         if palette is None:
-            palette = ui.palettes.add(config.PALETTE_ID, config.PALETTE_NAME, _HTML, True, True, True,
+            palette = ui.palettes.add(config.PALETTE_ID, config.PALETTE_NAME, palette_url(_HTML), True, True, True,
                                       config.PALETTE_WIDTH, config.PALETTE_HEIGHT)
             _safe(lambda: setattr(palette, 'dockingState', adsk.core.PaletteDockingStates.PaletteDockStateRight))
             cls._palette_handlers = []
