@@ -344,14 +344,23 @@ class WebCopy(unittest.TestCase):
         self.assertTrue(palette_command._HTML.endswith('panel.html'))
         with open(palette_command._HTML, encoding='utf-8') as f:
             html = f.read()
-        for needle in ('selectionChanged', 'readOps', 'src="optimizer.js"', 'href="index.html"'):
+        for needle in ('selectionChanged', 'readOps', 'src="optimizer.js"', 'fusionJavaScriptHandler'):
             self.assertIn(needle, html)
+        self.assertNotIn('index.html', html)       # the full calculator isn't bundled any more
 
-    def test_page_has_fusion_bridge(self):
-        with open(os.path.join(ROOT, 'web', 'index.html'), encoding='utf-8') as f:
+    def test_material_chip_table_is_complete(self):
+        import re
+        with open(os.path.join(ROOT, 'web', 'panel.html'), encoding='utf-8') as f:
             html = f.read()
-        for needle in ('fusionJavaScriptHandler', 'fusionSendData', 'src="optimizer.js"'):
-            self.assertIn(needle, html)
+        rows = re.findall(r'"([^"]+)":\s*\{ kc1:(\d+),\s*mc:([\d.]+), hexD:([\d.]+),\s*hmMin:([\d.]+) \}', html)
+        self.assertGreaterEqual(len(rows), 15)
+        for name, kc1, mc, hexd, hmmin in rows:
+            self.assertTrue(0.001 <= float(hexd) <= 0.02, name)
+            self.assertTrue(0.002 <= float(hmmin) <= 0.03, name)
+        al = dict((r[0], r) for r in rows)['Aluminium (wrought)']
+        self.assertEqual(al[1], '295')
+        # 1/4" tool in aluminium: about 0.002" (0.05 mm) per tooth, as in common chip-load charts
+        self.assertAlmostEqual(float(al[3]) * 6.35, 0.0508, places=3)
 
 
 if __name__ == '__main__':

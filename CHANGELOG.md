@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.0 — 2026-11-23
+
+Chip limits by material, tool deflection, and the force graph back in its familiar style. The full calculator is gone from the add-in.
+
+### New
+- **Chip thickness limits by material.** Max chip and Min chip fill in from a table per material (max chip as a fraction of tool diameter, e.g. 0.008 × D for aluminium; min chip as the rubbing threshold). The values show greyed as *auto*; type a value to override. See the README for the table and its sources.
+- **Tool deflection** for the current and optimized cut, from the peak force and the tool's stickout, plus an optional **Max deflection** limit (More limits).
+- **Stickout on the card,** read from the tool or assumed (1.25 × flute length) until you enter it.
+- A hint when the optimizer runs the stepover down to its 2% floor with no max feed set.
+
+### Changed
+- **The force graph matches the calculator's style again:** the optimized cut as a filled curve, the current cut as a grey line, 0 N at the bottom, a grid line every 90°, the force limit dashed, and a taller plot. Nothing is filtered; it's the exact force curve sampled every 0.1°.
+- **Removed the full calculator** from the add-in. The panel is the only page now, and only `optimizer.js` is copied from djr_cutcalculator.
+- Bulk view: the *Limited by* column uses short names (force, slope, max chip, …).
+
 ## v0.2.0 — 2026-11-23
 
 A compact panel made for Fusion, which follows what you select. The full calculator is one click away.

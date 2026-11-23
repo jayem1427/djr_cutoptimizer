@@ -99,7 +99,10 @@ table{ width:100%; border-collapse:collapse; }
 .bar i{ display:block; height:100%; background:var(--dykem); }
 .verdict{ margin-top:6px; font-size:12.5px; color:var(--muted); }
 .verdict b{ color:var(--ink); font-weight:600; }
-canvas{ display:block; width:100%; height:64px; margin-top:6px; border-radius:5px; background:var(--bg); border:1px solid var(--line); }
+.grid.four{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+.fld input::placeholder{ color:var(--muted); font-weight:500; opacity:1; }
+.foot .ver{ font-size:11.5px; color:var(--muted); }
+canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5px; background:var(--bg); border:1px solid var(--line); }
 .leg{ display:flex; gap:12px; font-size:11px; color:var(--muted); margin-top:3px; }
 .leg i{ display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:3px; margin-right:4px; }
 
@@ -154,17 +157,18 @@ canvas{ display:block; width:100%; height:64px; margin-top:6px; border-radius:5p
       <span class="lbl">Material</span><select id="mat"></select>
       <button type="button" class="btn warn hidden" id="matok" title="Save this material on the setup">Confirm</button>
     </div>
-    <div class="grid">
+    <div class="grid four">
       <div class="fld"><label for="Fmax">Max force</label><div class="box"><input id="Fmax" class="num" inputmode="decimal"><span>N</span></div></div>
-      <div class="fld"><label for="slopeMax">Max force slope</label><div class="box"><input id="slopeMax" class="num" inputmode="decimal"><span>N/°</span></div></div>
-      <div class="fld"><label for="hexMax">Max chip</label><div class="box"><input id="hexMax" class="num" inputmode="decimal"><span>mm</span></div></div>
+      <div class="fld"><label for="slopeMax">Max slope</label><div class="box"><input id="slopeMax" class="num" inputmode="decimal"><span>N/°</span></div></div>
+      <div class="fld"><label for="hexMax" id="hexLbl">Max chip</label><div class="box"><input id="hexMax" class="num" inputmode="decimal" title="Blank = typical value for the material and tool diameter"><span>mm</span></div></div>
+      <div class="fld"><label for="hmMin" id="hmLbl">Min chip</label><div class="box"><input id="hmMin" class="num" inputmode="decimal" title="Blank = typical rubbing threshold for the material"><span>mm</span></div></div>
     </div>
     <details id="more">
       <summary id="moresum">More limits</summary>
       <div class="grid">
         <div class="fld"><label for="nmax">Max spindle</label><div class="box"><input id="nmax" class="num" inputmode="decimal"><span>rpm</span></div></div>
         <div class="fld"><label for="vfmax">Max feed</label><div class="box"><input id="vfmax" class="num" inputmode="decimal"><span>mm/min</span></div></div>
-        <div class="fld"><label for="hmMin">Min chip</label><div class="box"><input id="hmMin" class="num" inputmode="decimal"><span>mm</span></div></div>
+        <div class="fld"><label for="deflMax">Max deflection</label><div class="box"><input id="deflMax" class="num" inputmode="decimal"><span>mm</span></div></div>
         <div class="fld"><label for="vcMin">Min v<sub>c</sub></label><div class="box"><input id="vcMin" class="num" inputmode="decimal"><span>m/min</span></div></div>
         <div class="fld"><label for="vcMax">Max v<sub>c</sub></label><div class="box"><input id="vcMax" class="num" inputmode="decimal"><span>m/min</span></div></div>
         <div class="fld"><label for="helixDefault">Helix if unknown</label><div class="box"><input id="helixDefault" class="num" inputmode="decimal"><span>°</span></div></div>
@@ -199,11 +203,12 @@ canvas{ display:block; width:100%; height:64px; margin-top:6px; border-radius:5p
         <tr class="hero"><td>Removal rate</td><td class="v num" id="c_q">–</td><td class="v num best" id="o_q">–</td><td class="u">cm³/min <span class="gain" id="gain"></span></td></tr>
         <tr><td>Peak force</td><td class="v num" id="c_f">–</td><td class="v num best" id="o_f">–</td><td class="u">N<span class="bar"><i id="b_f"></i></span></td></tr>
         <tr><td>Force slope</td><td class="v num" id="c_s">–</td><td class="v num best" id="o_s">–</td><td class="u">N/°<span class="bar"><i id="b_s"></i></span></td></tr>
+        <tr><td>Deflection</td><td class="v num" id="c_d">–</td><td class="v num best" id="o_d">–</td><td class="u">mm<span class="bar"><i id="b_d"></i></span></td></tr>
       </tbody>
     </table>
     <p class="verdict" id="verdict"></p>
     <canvas id="curve" aria-label="Cutting force through one revolution, current and optimized"></canvas>
-    <div class="leg"><span><i style="border-color:var(--muted)"></i>Current</span><span><i style="border-color:var(--dykem)"></i>Optimized</span><span><i style="border-color:var(--bronze);border-top-style:dashed"></i>Force limit</span></div>
+    <div class="leg"><span>0–360°, one revolution</span><span><i style="border-color:var(--muted)"></i>Current</span><span><i style="border-color:var(--dykem)"></i>Optimized</span><span><i style="border-color:var(--bronze);border-top-style:dashed"></i>Force limit</span></div>
   </section>
 
   <!-- all selected -->
@@ -221,7 +226,7 @@ canvas{ display:block; width:100%; height:64px; margin-top:6px; border-radius:5p
   </section>
 
   <div class="foot">
-    <a href="index.html" id="full" title="Open the full calculator, with the stepover × depth map">Full calculator ↗</a>
+    <span class="ver" id="ver"></span>
     <span class="sp"></span>
     <button type="button" class="btn" id="apply" disabled title="Writing back to the operation comes in the next version">Apply (coming soon)</button>
   </div>
@@ -230,17 +235,36 @@ canvas{ display:block; width:100%; height:64px; margin-top:6px; border-radius:5p
 <script src="optimizer.js"></script>
 <script>
 /* Compact optimizer panel for the djr_cutoptimizer Fusion add-in. Metric throughout.
-   MATERIALS mirrors the calculator's table (index.html); keep them in step. */
+
+   kc1 (N/mm²) and mc mirror the calculator's material table.
+   Chip limits are for solid carbide end mills:
+     hexD  = max chip thickness as a fraction of tool diameter. Aluminium 0.008·D matches the
+             common chip-load chart (0.001" per tooth at 1/8" up to 0.004" at 1/2"); harder
+             materials scale down the same way.
+     hmMin = average chip below which the edge rubs instead of cutting (mm).
+   These are typical starting values, not a standard: check your tool maker's chart.
+   Typing a value in Max chip or Min chip overrides them. */
 const MATERIALS = {
-  "Aluminium (wrought)":[295,0.25], "Aluminium (cast)":[345,0.25], "Brass / bronze":[550,0.25],
-  "Copper":[900,0.25], "Grey cast iron (<200 HB)":[1020,0.25], "Nodular cast iron":[1350,0.25],
-  "Structural steel":[1780,0.21], "Carbon steel":[2000,0.21], "Alloy steel":[2260,0.20],
-  "Tool steel (hardened)":[2900,0.20], "Stainless (austenitic)":[2000,0.21], "Stainless (martensitic)":[2400,0.21],
-  "Titanium alloy":[1500,0.25], "Nickel superalloy":[2650,0.25], "Plastic":[180,0.22]
+  "Aluminium (wrought)":      { kc1:295,  mc:0.25, hexD:0.008,  hmMin:0.005 },
+  "Aluminium (cast)":         { kc1:345,  mc:0.25, hexD:0.007,  hmMin:0.005 },
+  "Brass / bronze":           { kc1:550,  mc:0.25, hexD:0.006,  hmMin:0.005 },
+  "Copper":                   { kc1:900,  mc:0.25, hexD:0.005,  hmMin:0.008 },
+  "Grey cast iron (<200 HB)": { kc1:1020, mc:0.25, hexD:0.006,  hmMin:0.010 },
+  "Nodular cast iron":        { kc1:1350, mc:0.25, hexD:0.005,  hmMin:0.010 },
+  "Structural steel":         { kc1:1780, mc:0.21, hexD:0.005,  hmMin:0.010 },
+  "Carbon steel":             { kc1:2000, mc:0.21, hexD:0.005,  hmMin:0.010 },
+  "Alloy steel":              { kc1:2260, mc:0.20, hexD:0.004,  hmMin:0.010 },
+  "Tool steel (hardened)":    { kc1:2900, mc:0.20, hexD:0.0025, hmMin:0.010 },
+  "Stainless (austenitic)":   { kc1:2000, mc:0.21, hexD:0.004,  hmMin:0.015 },
+  "Stainless (martensitic)":  { kc1:2400, mc:0.21, hexD:0.004,  hmMin:0.012 },
+  "Titanium alloy":           { kc1:1500, mc:0.25, hexD:0.003,  hmMin:0.012 },
+  "Nickel superalloy":        { kc1:2650, mc:0.25, hexD:0.003,  hmMin:0.015 },
+  "Plastic":                  { kc1:180,  mc:0.22, hexD:0.010,  hmMin:0.020 }
 };
+const E_CARBIDE = 600000;   // N/mm², solid carbide (same as the calculator)
 const DEFAULT_MAT = "Aluminium (wrought)";
-const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","nmax","vfmax","hmMin","vcMin","vcMax","helixDefault","pmax","eta"];
-const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", nmax:24000, vfmax:"", hmMin:0.005, vcMin:"", vcMax:"", helixDefault:35, pmax:2.2, eta:0.85 };
+const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","eta"];
+const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", hmMin:"", nmax:24000, vfmax:"", deflMax:"", vcMin:"", vcMax:"", helixDefault:35, pmax:2.2, eta:0.85 };
 const WORKING = "__working";          // auto-saved working limits; hidden from the profile list
 const STEP = 0.1;
 const $ = id => document.getElementById(id);
@@ -288,15 +312,38 @@ function moreSummary(){
   const L = readLimits(), parts = [];
   if(L.nmax) parts.push(`${f(L.nmax,0)} rpm`);
   if(L.vfmax) parts.push(`feed ≤ ${f(L.vfmax,0)}`);
-  if(L.hmMin) parts.push(`chip ≥ ${g(L.hmMin,2)}`);
+  if(L.deflMax) parts.push(`deflection ≤ ${g(L.deflMax,2)}`);
   if(L.usePow && L.pmax) parts.push(`${g(L.pmax,2)} kW`);
   $("moresum").textContent = "More limits" + (parts.length ? ` · ${parts.join(" · ")}` : "");
 }
-function optimizerLimits(L){
-  const o = { nmax:L.nmax, Fmax:L.Fmax, slopeMax:L.slopeMax, vfmax:L.vfmax, hexMax:L.hexMax, hmMin:L.hmMin ?? 0, vcMin:L.vcMin, vcMax:L.vcMax };
+/* Typical chip limits for this op's material and tool, used when the fields are blank. */
+function chipAuto(p){ const M = MATERIALS[materialFor(p)]; return { hexMax: M.hexD * p.tool.D, hmMin: M.hmMin }; }
+
+/* Tool deflection: carbide cantilever with an equivalent diameter of 0.8·D, loaded at the tip
+   by the PEAK tangential force (the calculator used the mean force; peak is the worst case). */
+function deflection(F, D, so){ const I = Math.PI * Math.pow(0.8*D, 4) / 64; return F * Math.pow(so, 3) / (3 * E_CARBIDE * I); }
+function stickoutFor(p){
+  const o = overrides["so:" + toolKey(p)];
+  if(isFinite(o) && o > 0) return { so:o, assumed:false };
+  if(p.tool && p.tool.stickout > 0) return { so:p.tool.stickout, assumed:false };
+  const fl = p.tool && p.tool.fluteLen;
+  return { so: fl > 0 ? fl * 1.25 : 3 * p.tool.D, assumed:true };
+}
+
+/* The limits the optimizer sees for one op: chip limits filled from the material table,
+   and a deflection limit turned into the force it allows at this stickout. */
+function effLimits(p, L){
+  const a = chipAuto(p);
+  const o = { nmax:L.nmax, Fmax:L.Fmax, slopeMax:L.slopeMax, vfmax:L.vfmax,
+    hexMax: L.hexMax > 0 ? L.hexMax : a.hexMax, hmMin: L.hmMin > 0 ? L.hmMin : a.hmMin, vcMin:L.vcMin, vcMax:L.vcMax };
   if(L.usePow && L.pmax){ o.Pmax = L.pmax; o.eta = L.eta || 1; }
+  if(L.deflMax > 0){
+    const Fd = L.deflMax / deflection(1, p.tool.D, stickoutFor(p).so);
+    if(!(o.Fmax > 0) || Fd < o.Fmax){ o.Fmax = Fd; o.deflBinds = true; }
+  }
   return o;
 }
+function limitName(key, Lo){ return key === "force" && Lo.deflBinds ? "deflection" : (CutOpt.LIMIT_LABEL[key] || key); }
 
 /* ---------- profiles (Python JSON file in Fusion, localStorage elsewhere) ---------- */
 const LKEY = "djr-cutopt-profiles";
@@ -342,7 +389,7 @@ function materialFor(p){
   return MATERIALS[m] ? m : DEFAULT_MAT;
 }
 function toolOf(p, L){
-  const [kc1, mc] = MATERIALS[materialFor(p)];
+  const { kc1, mc } = MATERIALS[materialFor(p)];
   return { D:p.tool.D, z:p.tool.z || 2, helix:helixFor(p, L).helix, kc1, mc, rake:0, kappa:90, fluteLen:p.tool.fluteLen };
 }
 function geomOverride(p){ return overrides["geom:" + opKey(p)] || {}; }
@@ -356,7 +403,9 @@ function currentCut(p, L){
   let fz = p.op.fz;
   if(!(fz > 0) && p.op.vf > 0 && n > 0) fz = p.op.vf / (n * t.z);
   if(!(ae > 0 && ap > 0 && n > 0 && fz > 0)) return null;
-  return CutOpt.describe(CutOpt.normTool(t), n, Math.min(ae, t.D), ap, fz, STEP);
+  const c = CutOpt.describe(CutOpt.normTool(t), n, Math.min(ae, t.D), ap, fz, STEP);
+  c.defl = deflection(c.peak, t.D, stickoutFor(p).so);
+  return c;
 }
 
 function optimizeOp(p, L, bulk){
@@ -367,7 +416,13 @@ function optimizeOp(p, L, bulk){
   if(keepAe){ if(!(ae > 0)) return { ok:false, reason:"Stepover unknown. Enter it under Current, or untick Keep stepover." }; opts.aeLock = Math.min(ae, t.D); }
   if(keepAp){ if(!(ap > 0)) return { ok:false, reason:"Stepdown unknown. Enter it under Current, or untick Keep stepdown." }; opts.apLock = ap; }
   if(bulk){ opts.nAe = 20; opts.nAp = 20; }
-  try{ return CutOpt.optimize(t, optimizerLimits(L), opts); }
+  const Lo = effLimits(p, L);
+  try{
+    const r = CutOpt.optimize(t, Lo, opts);
+    if(r.ok){ r.best.bindLabel = limitName(r.best.bind, Lo); r.best.defl = deflection(r.best.peak, t.D, stickoutFor(p).so); }
+    else if(Lo.deflBinds && r.reason) r.reason = r.reason.replace(/cutting force limit/g, "deflection limit");
+    return r;
+  }
   catch(e){ return { ok:false, reason:"Optimizer error: " + (e && e.message || e) }; }
 }
 
@@ -383,6 +438,10 @@ function applyKeepDefaults(){
   $("keepAe").checked = d.ae; $("keepAp").checked = d.ap;
   $("keepAe").disabled = !!(p && p.kind === "slot");
 }
+
+/* Short limit names for the bulk table's narrow column. */
+const SHORT_LIMIT = { "cutting force":"force", "force slope":"slope", "feed rate":"feed", "spindle power":"power",
+  "max chip thickness":"max chip", "min chip thickness":"min chip", "cutting speed":"vc", "spindle speed":"rpm" };
 
 /* Short reasons for the bulk table. */
 function shortReason(r){
@@ -445,11 +504,12 @@ function renderCard(){
   $("opname").textContent = p.operation;
   $("opname").title = `${p.operation} — ${p.setup}`;
   if(!p.ok){ $("opmeta").innerHTML = `${esc(p.strategyLabel || p.strategy)} · Setup <b>${esc(p.setup)}</b> · <span class="assumed">${esc(p.reason)}</span>`; return; }
-  const L = readLimits(), h = helixFor(p, L);
+  const L = readLimits(), h = helixFor(p, L), so = stickoutFor(p);
   $("opmeta").innerHTML =
     `<span>${esc(p.strategyLabel || p.strategy)}</span>` +
     `<span><b>Ø${g(p.tool.D,3)}</b> mm · <b>${p.tool.z ?? "?"}</b> fl${p.tool.fluteLen ? ` · ${g(p.tool.fluteLen,3)} long` : ""}</span>` +
     `<span>helix <input id="helix" class="num" value="${h.helix}" inputmode="decimal" aria-label="Helix angle">°${h.assumed ? ' <span class="assumed" title="This tool has no helix angle in Fusion">assumed</span>' : ""}</span>` +
+    `<span>stickout <input id="so" class="num" value="${+g(so.so,3).replace(/,/g,"")}" inputmode="decimal" aria-label="Tool stickout">mm${so.assumed ? ' <span class="assumed" title="Not read from the tool: assumed 1.25 × flute length">assumed</span>' : ""}</span>` +
     `<span>Setup <b>${esc(p.setup)}</b></span>` +
     (p.toolDesc ? `<span title="${esc(p.toolDesc)}">${esc(p.toolDesc.length > 28 ? p.toolDesc.slice(0,27) + "…" : p.toolDesc)}</span>` : "");
   $("helix").addEventListener("change", e => {
@@ -457,14 +517,29 @@ function renderCard(){
     if(isFinite(v) && v >= 0) overrides[toolKey(p)] = v; else delete overrides[toolKey(p)];
     saveWorking(); results = {}; renderCard(); schedule();
   });
+  $("so").addEventListener("change", e => {
+    const v = parseFloat(e.target.value);
+    if(isFinite(v) && v > 0) overrides["so:" + toolKey(p)] = v; else delete overrides["so:" + toolKey(p)];
+    saveWorking(); results = {}; renderCard(); schedule();
+  });
+}
+
+/* Chip fields show the material's typical value as a grey placeholder when left blank. */
+function renderChipAuto(){
+  const p = ops[idx] && ops[idx].ok ? ops[idx] : readable()[0];
+  const a = p ? chipAuto(p) : { hexMax: MATERIALS[$("mat").value].hexD * 6, hmMin: MATERIALS[$("mat").value].hmMin };
+  $("hexMax").placeholder = p ? g(a.hexMax, 2) : "auto";
+  $("hmMin").placeholder = g(a.hmMin, 2);
+  $("hexLbl").textContent = $("hexMax").value ? "Max chip" : "Max chip · auto";
+  $("hmLbl").textContent = $("hmMin").value ? "Min chip" : "Min chip · auto";
 }
 
 function setCell(id, v, s){ $(id).textContent = typeof v === "string" ? v : g(v, s); }
 function renderOne(){
   const p = ops[idx], L = readLimits();
-  const ids = ["c_n","c_vf","c_fz","c_q","c_f","c_s","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_f","o_s"];
+  const ids = ["c_n","c_vf","c_fz","c_q","c_f","c_s","c_d","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_f","o_s","o_d"];
   ids.forEach(i => $(i).textContent = "–"); $("gain").textContent = ""; $("verdict").textContent = "";
-  $("b_f").style.width = "0"; $("b_s").style.width = "0";
+  $("b_f").style.width = "0"; $("b_s").style.width = "0"; $("b_d").style.width = "0";
   if(!p || !p.ok){ $("c_ae").value = ""; $("c_ap").value = ""; drawCurve(null, null, L); return; }
   const geo = currentGeom(p);
   if(document.activeElement !== $("c_ae")) $("c_ae").value = geo.ae > 0 ? +g(geo.ae, 4).replace(/,/g,"") : "";
@@ -472,26 +547,29 @@ function renderOne(){
   const R = results[opKey(p)] || {}, cur = R.cur, opt = R.opt;
   if(cur){
     setCell("c_n", f(cur.n,0)); setCell("c_vf", f(cur.vf,0)); setCell("c_fz", cur.fz, 3);
-    setCell("c_q", cur.Q, 3); setCell("c_f", cur.peak, 3); setCell("c_s", cur.robustSlope, 3);
+    setCell("c_q", cur.Q, 3); setCell("c_f", cur.peak, 3); setCell("c_s", cur.robustSlope, 3); setCell("c_d", cur.defl, 2);
   } else {
     setCell("c_n", p.op.n > 0 ? f(p.op.n,0) : "–"); setCell("c_vf", p.op.vf > 0 ? f(p.op.vf,0) : "–");
   }
   if(opt && opt.ok){
     const b = opt.best;
     setCell("o_n", f(b.n,0)); setCell("o_vf", f(b.vf,0)); setCell("o_ae", b.ae, 3); setCell("o_ap", b.ap, 3);
-    setCell("o_fz", b.fz, 3); setCell("o_q", b.Q, 3); setCell("o_f", b.peak, 3); setCell("o_s", b.robustSlope, 3);
+    setCell("o_fz", b.fz, 3); setCell("o_q", b.Q, 3); setCell("o_f", b.peak, 3); setCell("o_s", b.robustSlope, 3); setCell("o_d", b.defl, 2);
+    const Lo = effLimits(p, L);
     if(L.Fmax) $("b_f").style.width = Math.min(100, b.peak / L.Fmax * 100) + "%";
+    if(L.deflMax) $("b_d").style.width = Math.min(100, b.defl / L.deflMax * 100) + "%";
     if(L.slopeMax) $("b_s").style.width = Math.min(100, b.robustSlope / L.slopeMax * 100) + "%";
     if(cur && cur.Q > 0){ const r = b.Q / cur.Q; $("gain").textContent = `×${f(r, 2)}`; $("gain").classList.toggle("down", r < 0.995);
       $("gain").title = r < 0.995 ? "Slower than now: the current cut is over your limits" : "Removal rate compared with now"; }
     let v = `Limited by <b>${esc(b.bindLabel)}</b>.`;
     if(opt.snapped) v += " Depth sits just under a whole flute pitch, where force is smoothest.";
     if(cur){
-      const over = CutOpt.checkLimits(cur, optimizerLimits(L), cur.n).map(x => CutOpt.LIMIT_LABEL[x.limit] || x.limit);
+      const over = CutOpt.checkLimits(cur, Lo, cur.n).map(x => limitName(x.limit, Lo));
       if(over.length) v += ` The current cut is over your ${[...new Set(over)].join(", ")} limit.`;
     } else v += " Couldn’t read the current cut fully, so there’s nothing to compare.";
-    if(!(L.hexMax > 0) && b.hex > 0.008 * p.tool.D) v +=` Chip is ${g(b.hex,2)} mm thick; set Max chip for your tool.`;
+    if(!(L.vfmax > 0) && b.ae <= 0.021 * p.tool.D) v += ` Stepover is at its 2% floor with a ${f(b.vf,0)} mm/min feed: set <b>Max feed</b> (More limits) to what your machine can really do.`;
     if(helixFor(p, L).assumed && L.slopeMax) v += " Helix is assumed; check it for the slope limit.";
+    if(stickoutFor(p).assumed && L.deflMax) v += " Stickout is assumed; check it for the deflection limit.";
     $("verdict").innerHTML = v;
   } else if(opt){
     $("verdict").innerHTML = `<b>No result:</b> ${esc(opt.reason)}`;
@@ -516,7 +594,7 @@ function renderAll(){
     n++;
     tr.className = "okrow"; tr.title = "Open this operation";
     tr.innerHTML = tcell + ncell + `<td class="q">${cur ? g(cur.Q,3) : "–"}</td><td class="q" style="color:var(--dykem)">${g(opt.best.Q,3)}</td>` +
-      `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td><td class="l" style="color:var(--muted)">${esc(opt.best.bindLabel)}</td>`;
+      `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td><td class="l" style="color:var(--muted)" title="${esc(opt.best.bindLabel)}">${esc(SHORT_LIMIT[opt.best.bindLabel] || opt.best.bindLabel)}</td>`;
     tr.addEventListener("click", () => { idx = i; setMode("one"); });
     tb.appendChild(tr);
   });
@@ -524,24 +602,27 @@ function renderAll(){
     `<span><b>${n}</b> of ${ops.length} optimized · removal rate in cm³/min</span><span>${gainN ? `average <b class="gain">×${f(gainSum/gainN,2)}</b>` : ""}</span>`;
 }
 
-function render(){ moreSummary(); if(mode === "one") renderOne(); else renderAll(); }
+function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne(); else renderAll(); }
 
-/* ---------- force curve ---------- */
+/* ---------- force curve ----------
+   Same style as the calculator: tangential force over one revolution (0–360°), 0 N at the
+   bottom, a grid line every 90°. The optimized cut is the filled curve, the current cut the
+   grey line, the force limit dashed. Nothing is filtered; samples are every 0.1°. */
 function drawCurve(cur, best, L){
-  const cv = $("curve"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 300, H = cv.clientHeight || 64;
+  const cv = $("curve"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 300, H = cv.clientHeight || 84;
   cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
   const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
-  const curves = [];
-  if(cur && cur.forces) curves.push([cur.forces, tok("--muted"), 1.5]);
-  if(best && best.forces) curves.push([best.forces, tok("--dykem"), 2]);
-  if(!curves.length) return;
-  const top = Math.max(...curves.map(c => Math.max(...c[0])), L.Fmax || 0) * 1.08 || 1, pad = 4;
-  const Y = v => H - pad - v/top*(H - 2*pad);
-  curves.forEach(([F, col, w]) => {
-    ctx.beginPath(); const n = F.length;
-    for(let i=0;i<=n;i++){ const x = W*i/n, y = Y(F[i % n]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }
-    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineJoin = "round"; ctx.stroke();
-  });
+  ctx.strokeStyle = tok("--line"); ctx.lineWidth = 1;
+  for(let q=1;q<4;q++){ const x = W*q/4; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  const peaks = [cur && cur.forces ? cur.peak : 0, best && best.forces ? best.peak : 0, L.Fmax || 0];
+  const top = Math.max(...peaks) * 1.08; if(!(top > 0)) return;
+  const pad = 4, Y = v => H - pad - v/top*(H - 2*pad);
+  const path = F => { const n = F.length; ctx.beginPath(); for(let i=0;i<=n;i++){ const x = W*i/n, y = Y(F[i % n]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); } };
+  if(best && best.forces){
+    path(best.forces); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fillStyle = tok("--dykem-soft"); ctx.fill();
+    path(best.forces); ctx.strokeStyle = tok("--dykem"); ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+  }
+  if(cur && cur.forces){ path(cur.forces); ctx.strokeStyle = tok("--muted"); ctx.lineWidth = 1.5; ctx.stroke(); }
   if(L.Fmax){ ctx.setLineDash([5,4]); ctx.strokeStyle = tok("--bronze"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, Y(L.Fmax)); ctx.lineTo(W, Y(L.Fmax)); ctx.stroke(); ctx.setLineDash([]); }
 }
 
@@ -580,6 +661,7 @@ function init(){
   const ms = $("mat");
   Object.keys(MATERIALS).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = k; ms.appendChild(o); });
   ms.value = DEFAULT_MAT;
+  $("ver").textContent = "djr_cutoptimizer";
   writeLimits(DEFAULT_LIMITS);
 
   LIMIT_FIELDS.forEach(k => $(k).addEventListener("change", () => { $("lsel").value = ""; saveWorking(); invalidate(); }));

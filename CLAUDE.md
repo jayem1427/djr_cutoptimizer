@@ -7,7 +7,7 @@ A Fusion add-in (Python) that opens the djr_cutcalculator page in a palette, fil
 | What | Where |
 |---|---|
 | This repo | `jayem1427/djr_cutoptimizer`, branch `main`. The repo root **is** the add-in folder. |
-| Calculator source | `jayem1427/cutcalculator` (`index.html`, `optimizer.js`, its Node tests). `web/` here is a copy made by `tools/sync_web.py`. Never edit `web/` directly. |
+| Model source | `jayem1427/cutcalculator` (`optimizer.js` and its Node tests). `web/optimizer.js` here is a copy made by `tools/sync_web.py`; never edit it directly. `web/panel.html` is owned here. |
 | Installed add-in | `%APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns\djr_cutoptimizer\` |
 | Limit profiles | `%APPDATA%\djr_cutoptimizer\limit_profiles.json` (Mac: `~/Library/Application Support/djr_cutoptimizer/`) |
 | Material per setup | setup attribute group `djr_cutcalc`, name `material` |
@@ -26,8 +26,10 @@ commands/optimizer/
   palette_command.py toolbar button, palette, HTML bridge, read_selection, set_material (adsk)
   cam_mapping.py     PURE: parameter names, unit parsing, supported strategies, payload
   profiles.py        PURE: limit profiles JSON (atomic write)
-web/panel.html       the compact panel the palette opens (owned here; not synced)
-web/index.html, optimizer.js  the full calculator (copied from cutcalculator; see above)
+web/panel.html       the compact panel the palette opens (owned here). Holds the material table
+                     (kc1, mc, chip limits), deflection, per-op-type defaults and the bulk view.
+web/optimizer.js     the model (copied from cutcalculator; see above)
+docs/images/         README renderings of panel.html (headless Chrome, fake bridge, sample ops)
 scripts/djr_dump_cam_params/  Fusion script that dumps every op/tool parameter
 tools/               build_release.py, release_install.md, sync_web.py
 tests/               test_addin.py (stdlib unittest with a fake adsk), web_optimizer.test.js (Node)
@@ -37,8 +39,9 @@ tests/               test_addin.py (stdlib unittest with a fake adsk), web_optim
 
 - JS → Python: `adsk.fusionSendData(action, json)` → `palette.incomingFromHTML`; the handler sets `args.returnData`, which the JS receives as a Promise result.
 - Python → JS: `palette.sendInfoToHTML(action, json)` → `window.fusionJavaScriptHandler.handle(action, data)`.
-- Actions from the page: `ready`/`readOps` (every selected op; setups, folders and patterns expand), `readSelection` (first op only; used by the full calculator), `getLimits`, `saveLimits`, `setMaterial` (`{material, setups}`). To the page: `selectionChanged` (pushed from `ui.activeSelectionChanged` while the palette is visible; an empty selection is ignored), `fusionStatus`.
-- Limit profiles: names starting `__` are internal. `__working` holds the panel's working limits and per-tool helix overrides.
+- Actions from the page: `ready`/`readOps` (every selected op; setups, folders and patterns expand), `getLimits`, `saveLimits`, `setMaterial` (`{material, setups}`). To the page: `selectionChanged` (pushed from `ui.activeSelectionChanged` while the palette is visible; an empty selection is ignored), `fusionStatus`.
+- Limit profiles: names starting `__` are internal. `__working` holds the panel's working limits and per-tool overrides (helix by tool key, `so:` stickout, `geom:` current stepover/stepdown).
+- The full calculator page was removed from the add-in in v0.3.0 at the owner's request; don't bring it back.
 - Python sends metric (mm, rpm, mm/min); the page switches to metric on load.
 - The page detects Fusion lazily (`hasFusion()` at init and again after 800 ms), because `window.adsk` may be injected late.
 
@@ -68,5 +71,6 @@ None of this replaces a real Fusion run. Be explicit about what was verified in 
 ## Model notes (don't relearn these)
 
 - Force slope near a whole flute pitch is one-sided: smooth just *below* m·pitch, full entry slope immediately above. `robustSlope` takes the worst within ±0.05 mm, and the optimizer snaps to `m·pitch − tol`.
-- With no max chip thickness, kc's chip-thinning reward pushes toward thick chips. The page warns about this.
+- With no max chip thickness, kc's chip-thinning reward pushes toward thick chips; v0.3 fills max chip from the material table. With no max feed, thin stepovers allow very high feeds; the panel hints to set Max feed.
+- Deflection uses the PEAK force (the calculator used the mean). A deflection limit is converted to an equivalent force cap per op (`effLimits`).
 - Don't copy FSWizard's data or methods (EULA).

@@ -75,7 +75,7 @@ def main() -> None:
     if args.tag and args.tag != f"v{manifest_version}":
         sys.exit(f"tag {args.tag} does not match version v{manifest_version}")
     notes = release_notes(manifest_version)
-    for f in ("index.html", "optimizer.js"):
+    for f in ("panel.html", "optimizer.js"):
         if not (ROOT / "web" / f).is_file():
             sys.exit(f"web/{f} is missing; run python tools/sync_web.py")
     if args.check:

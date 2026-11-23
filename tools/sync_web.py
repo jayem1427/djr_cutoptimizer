@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy the calculator page into web/. The calculator repo is the one source.
+"""Copy the shared optimizer.js into web/. The calculator repo is its one source.
 
     python tools/sync_web.py                 # copy from ../cutcalculator
     python tools/sync_web.py --from PATH     # copy from another checkout
@@ -12,7 +12,7 @@ import shutil
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FILES = ['index.html', 'optimizer.js']
+FILES = ['optimizer.js']
 DEST = os.path.join(ROOT, 'web')
 SOURCE = os.path.join(os.path.dirname(ROOT), 'cutcalculator')
 

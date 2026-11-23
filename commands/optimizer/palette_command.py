@@ -5,9 +5,8 @@ optimizer panel (web/panel.html) and keeps it in step with the CAM selection.
 Bridge:
   JS -> Python: adsk.fusionSendData(action, json)  -> incomingFromHTML (returnData answers)
   Python -> JS: palette.sendInfoToHTML(action, json) -> window.fusionJavaScriptHandler.handle
-Actions from the page: ready, readOps, readSelection (first op only; the full
-calculator uses it), getLimits, saveLimits, setMaterial.
-Actions to the page:   selectionChanged (same shape as readOps), loadCut, fusionStatus.
+Actions from the page: ready, readOps, getLimits, saveLimits, setMaterial.
+Actions to the page:   selectionChanged (same shape as readOps), fusionStatus.
 """
 from __future__ import annotations
 
@@ -158,8 +157,6 @@ class OptimizerCommand:
             data = {}
         if action in ('ready', 'readOps'):
             args.returnData = json.dumps(cls.read_ops())
-        elif action == 'readSelection':
-            args.returnData = json.dumps(cls.read_selection())
         elif action == 'getLimits':
             args.returnData = json.dumps(profiles.load())
         elif action == 'saveLimits':
@@ -259,7 +256,7 @@ class OptimizerCommand:
 
     @classmethod
     def read_selection(cls) -> dict:
-        """The first readable selected operation, in the full calculator's single-op shape."""
+        """The first readable selected operation (single-op shape)."""
         result = cls.read_ops()
         if not result.get('ok'):
             return {'ok': False, 'reason': result.get('reason', '')}
