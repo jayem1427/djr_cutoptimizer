@@ -122,13 +122,33 @@ class _Attrs:
         self.store[(group, name)] = value
 
 
-def _fake_op(strategy='adaptive2d', tool_rows=None, op_rows=None):
-    setup = types.SimpleNamespace(name='Setup1', attributes=_Attrs())
+class _Coll:
+    def __init__(self, items):
+        self._items = items
+
+    @property
+    def count(self):
+        return len(self._items)
+
+    def item(self, i):
+        return self._items[i]
+
+
+def _fake_setup(name='Setup1', ops=()):
+    setup = types.SimpleNamespace(objectType='adsk::cam::Setup', name=name, attributes=_Attrs())
+    for op in ops:
+        op.parentSetup = setup
+    setup.allOperations = _Coll(list(ops))
+    return setup
+
+
+def _fake_op(strategy='adaptive2d', tool_rows=None, op_rows=None, name='Adaptive1', setup=None):
+    setup = setup or types.SimpleNamespace(name='Setup1', attributes=_Attrs())
     tool = types.SimpleNamespace(parameters=_Params(tool_rows if tool_rows is not None else [
         ('tool_diameter', '6 mm', 0.6), ('tool_numberOfFlutes', '4', 4), ('tool_fluteLength', '18 mm', 1.8),
-        ('tool_bodyLength', '20 mm', 2.0)]))
+        ('tool_bodyLength', '20 mm', 2.0), ('tool_number', '12', 12), ('tool_description', "'6mm 4FL flat'", '')]))
     return types.SimpleNamespace(
-        objectType='adsk::cam::Operation', name='Adaptive1', strategy=strategy, tool=tool, parentSetup=setup,
+        objectType='adsk::cam::Operation', name=name, strategy=strategy, tool=tool, parentSetup=setup,
         parameters=_Params(op_rows if op_rows is not None else [
             ('tool_spindleSpeed', '24000 rpm', 24000), ('tool_feedCutting', '6278 mm/min', 627.8),
             ('optimalLoad', '1.67 mm', 0.167), ('maximumStepdown', '15 mm', 1.5)]))
@@ -249,6 +269,52 @@ class PaletteUrl(unittest.TestCase):
         self.assertEqual(palette_url(p), p)
 
 
+class ReadOps(unittest.TestCase):
+    def setUp(self):
+        _State.document, _State.selections = _cam_doc(), []
+
+    def test_card_fields(self):
+        _State.selections = [_fake_op()]
+        r = OptimizerCommand.read_ops()
+        self.assertTrue(r['ok'])
+        p = r['ops'][0]
+        self.assertEqual(p['toolNumber'], '12')
+        self.assertEqual(p['toolDesc'], '6mm 4FL flat')
+        self.assertEqual(p['strategyLabel'], '2D Adaptive')
+        self.assertEqual(p['setup'], 'Setup1')
+
+    def test_empty_selection_is_flagged(self):
+        r = OptimizerCommand.read_ops()
+        self.assertFalse(r['ok'])
+        self.assertTrue(r['empty'])
+
+    def test_setup_expands_to_its_operations(self):
+        a, b, d = _fake_op(name='R1'), _fake_op('contour2d', name='F1'), _fake_op('drill', name='D1')
+        setup = _fake_setup('Op1', [a, b, d])
+        _State.selections = [setup]
+        r = OptimizerCommand.read_ops()
+        self.assertEqual([p['operation'] for p in r['ops']], ['R1', 'F1', 'D1'])
+        self.assertEqual([p['ok'] for p in r['ops']], [True, True, False])
+        self.assertIn('Drilling', r['ops'][2]['reason'])
+        json.dumps(r)
+
+    def test_op_and_its_setup_both_selected_is_deduplicated(self):
+        a = _fake_op(name='R1')
+        setup = _fake_setup('Op1', [a])
+        _State.selections = [a, setup]
+        self.assertEqual(len(OptimizerCommand.read_ops()['ops']), 1)
+
+    def test_material_saved_on_every_setup(self):
+        a, b = _fake_op(name='R1'), _fake_op(name='R2')
+        s1, s2 = _fake_setup('S1', [a]), _fake_setup('S2', [b])
+        _State.selections = [s1, s2]
+        OptimizerCommand.read_ops()
+        r = OptimizerCommand.set_material('Aluminium (wrought)', ['S1', 'S2'])
+        self.assertTrue(r['ok'])
+        self.assertEqual(sorted(r['setups']), ['S1', 'S2'])
+        self.assertEqual([p['material'] for p in OptimizerCommand.read_ops()['ops']], ['Aluminium (wrought)'] * 2)
+
+
 class Profiles(unittest.TestCase):
     def test_round_trip(self):
         with tempfile.TemporaryDirectory() as d:
@@ -272,6 +338,14 @@ class WebCopy(unittest.TestCase):
     @unittest.skipUnless(os.path.isdir(sync_web.SOURCE), 'cutcalculator checkout not next to this repo')
     def test_in_sync_with_calculator(self):
         self.assertEqual(sync_web.stale(), [], 'run python tools/sync_web.py')
+
+    def test_panel_is_the_palette_page(self):
+        from djr_cutoptimizer.commands.optimizer import palette_command
+        self.assertTrue(palette_command._HTML.endswith('panel.html'))
+        with open(palette_command._HTML, encoding='utf-8') as f:
+            html = f.read()
+        for needle in ('selectionChanged', 'readOps', 'src="optimizer.js"', 'href="index.html"'):
+            self.assertIn(needle, html)
 
     def test_page_has_fusion_bridge(self):
         with open(os.path.join(ROOT, 'web', 'index.html'), encoding='utf-8') as f:

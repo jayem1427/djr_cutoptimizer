@@ -4,7 +4,7 @@ A Fusion add-in that picks **feeds, speeds, stepover and stepdown** for a CAM op
 
 It opens the [djr_cutcalculator](https://github.com/jayem1427/cutcalculator) in a panel beside the Manufacture workspace and fills it from the operation you selected.
 
-> **Status: v0.1.0, read-only, not yet tested in a real Fusion session.** The add-in reads the selected operation and optimizes it in the panel. It doesn't write anything back to the operation yet; that's the next version (Apply). The Fusion parameter names it reads aren't verified yet either. See [Status](#status).
+> **Status: v0.2, read-only.** The panel loads in Fusion (checked on Windows). It reads and optimizes the selected operations, but doesn't write anything back to them yet; that's the next version (Apply). The Fusion parameter names it reads aren't verified yet either. See [Status](#status).
 
 ## Install
 
@@ -18,12 +18,14 @@ To upgrade, replace the folder. Your limit profiles live outside it and carry ov
 
 ## Use
 
-1. In **Manufacture**, select an operation (adaptive, 2D contour, pocket, slot or face) in the browser.
-2. Click **Optimize feeds & speeds** in the **Actions** panel. The calculator opens on the right with the operation's tool, stepover, stepdown, spindle speed and feed filled in. Press **Read selected operation** to load a different one.
-3. The first time for each setup, pick the stock **material**. It's saved on the setup.
-4. Check the tool's **helix angle**. Fusion tools often don't have one, and the force-slope limit needs it.
-5. Set your limits (see below) and press **Optimize**. The best stepover, depth, feed per tooth and cutting speed are filled in, and the stepover × depth map shows the alternatives. Click any cell on the map to use it instead.
-6. Copy the numbers into the operation by hand. (Apply comes in the next version.)
+1. In **Manufacture**, click **Optimize feeds & speeds** in the **Actions** panel. A compact panel opens on the right.
+2. Click an operation in the CAM browser. The card at the top names it (tool number, operation, strategy, tool, setup), and the panel shows the current cut next to the best one inside your limits, with the removal-rate gain. It re-optimizes on its own whenever you click another operation or change a limit.
+3. **Bulk:** Ctrl-click several operations, or click a whole setup. Then open **All selected** for one row per operation: removal rate now, the best, the gain and what limits it. Click a row to open it.
+4. The first time for each setup, pick the stock **material** and press **Confirm**. It's saved on the setup.
+5. Check the **helix** on the card. Fusion tools often don't have one, and the force-slope limit needs it. Enter it once per tool.
+6. Copy the optimized numbers into the operation by hand. (Apply comes in the next version.)
+
+**What stays fixed:** an adaptive keeps its stepdown, a contour or slot keeps its stepover, and bulk keeps both. Untick **Keep stepover** / **Keep stepdown** to let the optimizer change them. For the stepover × depth map, open **Full calculator**.
 
 ### Limits
 
@@ -40,7 +42,7 @@ The quick path is just the first two: **max cutting force** and **max force slop
 | Min / max cutting speed | Optional surface-speed window. |
 | Spindle power | Tick to also limit by the spindle power in “Your machine”. |
 
-Save sets of limits as named **profiles**, for example per machine, material or tool. Max spindle speed comes from “Your machine”. Tick **Lock** next to stepover or depth to keep it fixed while optimizing, for example to hold depth at the floor depth.
+The first three are always visible; the rest are under **More limits**, along with named **profiles** (for example per machine, material or tool). Your working limits are saved automatically.
 
 ## How it works
 
@@ -69,14 +71,15 @@ Force and force slope both scale exactly with f<sub>z</sub><sup>1−m<sub>c</sub
 | | |
 |---|---|
 | Verified by tests | The force model and optimizer against the Sandvik and HSM reference cuts (15 tests on the bundled `optimizer.js`). Unit-reading, operation filtering, limit profiles, and no crash with no document, no CAM data, nothing selected or an unsupported operation (19 tests against a fake Fusion API). The panel page's Fusion mode, driven by a fake bridge in headless Chrome. |
-| Not verified yet | Anything inside real Fusion: the toolbar button, the panel, reading a real operation. |
+| Checked in Fusion (Windows) | The toolbar button and the panel load (v0.1.1). |
+| Not verified yet | Reading real operations, following the selection, bulk, and storing the material on a setup. |
 | Unverified names | The CAM parameter names in `commands/optimizer/cam_mapping.py` (`tool_spindleSpeed`, `optimalLoad`, `maximumStepdown`, …). |
 
 **Help verify the parameter names:** run the `djr_dump_cam_params` script from the release (Scripts tab → **+** → the unzipped folder → **Run**) with an adaptive, a 2D contour and a slot selected. Then commit its output to `docs/cam_params/`.
 
 ## Roadmap
 
-- **v0.2: Apply.** Write spindle speed and feed (and stepover/stepdown, if ticked) back to the operation and regenerate it, with undo or revert. Don't overwrite ramp, plunge or lead feeds that you set as expressions.
+- **v0.3: Apply.** Write spindle speed and feed (and stepover/stepdown, if ticked) back to the operation and regenerate it, with undo or revert. Don't overwrite ramp, plunge or lead feeds that you set as expressions.
 - **Later.** "Save as preset" into the tool library, and "Optimize all in setup", possibly hooking into [djr_batchpost](https://github.com/jayem1427/djr_batchpost).
 
 ## Development

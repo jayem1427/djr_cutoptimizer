@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.2.0 — 2026-11-23
+
+A compact panel made for Fusion, which follows what you select. The full calculator is one click away.
+
+### New
+- **Compact panel, no scrolling.** The operation card at the top names what you're optimizing: tool number, operation, strategy, tool Ø and flutes, helix, and setup. Below it are the key limits, a current-vs-optimized table with the removal-rate gain, and a small force curve.
+- **Follows the CAM browser selection.** Click an operation and the panel updates and re-optimizes on its own. Clicking into the panel keeps what's shown.
+- **Bulk: select several operations or a whole setup.** The *All selected* tab lists every operation with its removal rate now, the best inside your limits, the gain and what limits it. Operations the model doesn't cover say why. Bulk keeps each operation's stepover and stepdown by default. Click a row to open that operation.
+- **Sensible defaults per operation type.** An adaptive keeps its stepdown, a contour or slot keeps its stepover, and a slot's stepover is always the tool diameter. Untick *Keep stepover* or *Keep stepdown* to free them.
+- **Current stepover and stepdown are editable,** for when Fusion's values can't be read.
+- **Helix per tool:** enter it once on the card. Tools without one use *Helix if unknown* (default 35°) and are marked "assumed".
+- **Material per setup:** pick it and press *Confirm*. It's saved on every setup in the selection.
+- Working limits are saved automatically, and named limit profiles live under *More limits*.
+- A gain below ×1 shows in amber: the current cut is over your limits, so the safe cut is slower.
+- The full calculator (with the stepover × depth map) has a link back to the compact panel.
+
 ## v0.1.1 — 2026-11-23
 
 ### Fixed

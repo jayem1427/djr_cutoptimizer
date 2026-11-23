@@ -26,7 +26,8 @@ commands/optimizer/
   palette_command.py toolbar button, palette, HTML bridge, read_selection, set_material (adsk)
   cam_mapping.py     PURE: parameter names, unit parsing, supported strategies, payload
   profiles.py        PURE: limit profiles JSON (atomic write)
-web/                 calculator page + optimizer.js (copied; see above)
+web/panel.html       the compact panel the palette opens (owned here; not synced)
+web/index.html, optimizer.js  the full calculator (copied from cutcalculator; see above)
 scripts/djr_dump_cam_params/  Fusion script that dumps every op/tool parameter
 tools/               build_release.py, release_install.md, sync_web.py
 tests/               test_addin.py (stdlib unittest with a fake adsk), web_optimizer.test.js (Node)
@@ -36,7 +37,8 @@ tests/               test_addin.py (stdlib unittest with a fake adsk), web_optim
 
 - JS → Python: `adsk.fusionSendData(action, json)` → `palette.incomingFromHTML`; the handler sets `args.returnData`, which the JS receives as a Promise result.
 - Python → JS: `palette.sendInfoToHTML(action, json)` → `window.fusionJavaScriptHandler.handle(action, data)`.
-- Actions from the page: `ready`, `readSelection`, `getLimits`, `saveLimits`, `setMaterial`. To the page: `loadCut`, `fusionStatus`.
+- Actions from the page: `ready`/`readOps` (every selected op; setups, folders and patterns expand), `readSelection` (first op only; used by the full calculator), `getLimits`, `saveLimits`, `setMaterial` (`{material, setups}`). To the page: `selectionChanged` (pushed from `ui.activeSelectionChanged` while the palette is visible; an empty selection is ignored), `fusionStatus`.
+- Limit profiles: names starting `__` are internal. `__working` holds the panel's working limits and per-tool helix overrides.
 - Python sends metric (mm, rpm, mm/min); the page switches to metric on load.
 - The page detects Fusion lazily (`hasFusion()` at init and again after 800 ms), because `window.adsk` may be injected late.
 
@@ -60,7 +62,7 @@ None of this replaces a real Fusion run. Be explicit about what was verified in 
 ## Next work (from the original handoff)
 
 1. **Verify parameter names.** The owner runs `djr_dump_cam_params` on an adaptive, a 2D contour and a slot; commit the output to `docs/cam_params/`. Then fix `OP_NAMES`, `TOOL_NAMES` and `INTERNAL_TO_CALC` in `cam_mapping.py`. The feed and speed internal units are unverified; expression parsing is used first, so internal units only matter for expressions that reference other parameters.
-2. **v0.2 Apply:** write spindle speed and cutting feed (plus stepover/stepdown when ticked), then `cam.generateToolpath(op)`. Make it one undoable step if the API allows; otherwise snapshot the old expressions and offer Revert. Ramp, plunge and lead feeds are often expressions tied to the cutting feed; don't overwrite user-set expressions without asking. Refuse unsupported strategies (`cam_mapping.REFUSED`).
+2. **v0.3 Apply:** write spindle speed and cutting feed (plus stepover/stepdown when ticked), then `cam.generateToolpath(op)`. Make it one undoable step if the API allows; otherwise snapshot the old expressions and offer Revert. Ramp, plunge and lead feeds are often expressions tied to the cutting feed; don't overwrite user-set expressions without asking. Refuse unsupported strategies (`cam_mapping.REFUSED`).
 3. **Later:** "Save as preset" into the tool library; "Optimize all in setup", possibly with djr_batchpost.
 
 ## Model notes (don't relearn these)

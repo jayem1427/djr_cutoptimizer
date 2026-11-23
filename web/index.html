@@ -1195,6 +1195,11 @@ function initFusion(){
   document.documentElement.classList.add("fusion");
   $("fread").hidden = false;
   $("fread").addEventListener("click", readFusionSelection);
+  // The add-in opens a compact panel first; offer the way back to it.
+  const back = document.createElement("a");
+  back.href = "panel.html"; back.textContent = "← Compact panel"; back.className = "btn";
+  back.style.textDecoration = "none";
+  $("fread").after(back);
   readFusionSelection();
 }
 window.fusionJavaScriptHandler = {

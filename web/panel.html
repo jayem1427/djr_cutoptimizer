@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cut optimizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9ECEE; --surface:#F7F8F9; --ink:#16202A; --muted:#5B6672; --line:#CBD1D7;
+  --dykem:#2B3A8F; --dykem-soft:rgba(43,58,143,.10); --good:#2F7D4F; --bronze:#A8622A;
+  --warn-bg:#FBF1DC; --warn-ink:#6B4A0E; --row-hi:rgba(43,58,143,.07);
+  --sans:"Barlow", "Segoe UI", system-ui, sans-serif;
+  --num:"Barlow Condensed", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1A1F25; --surface:#232930; --ink:#E7EBEE; --muted:#9BA6B0; --line:#363E48;
+    --dykem:#8D9DF2; --dykem-soft:rgba(141,157,242,.16); --good:#6CC48F; --bronze:#C77B3E;
+    --warn-bg:#3A2F1A; --warn-ink:#F0D49A; --row-hi:rgba(141,157,242,.10);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1A1F25; --surface:#232930; --ink:#E7EBEE; --muted:#9BA6B0; --line:#363E48;
+  --dykem:#8D9DF2; --dykem-soft:rgba(141,157,242,.16); --good:#6CC48F; --bronze:#C77B3E;
+  --warn-bg:#3A2F1A; --warn-ink:#F0D49A; --row-hi:rgba(141,157,242,.10);
+  color-scheme: dark;
+}
+*,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+html,body{ height:100%; }
+body{ background:var(--bg); color:var(--ink); font:14px/1.35 var(--sans); -webkit-font-smoothing:antialiased; }
+.app{ display:flex; flex-direction:column; gap:8px; padding:10px 10px 8px; min-height:100%; max-width:640px; margin:0 auto; }
+.card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:9px 11px; }
+.num{ font-family:var(--num); font-variant-numeric:tabular-nums; }
+button, input, select{ font:inherit; color:inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible{ outline:2px solid var(--dykem); outline-offset:1px; }
+
+/* operation card */
+.op{ border-left:4px solid var(--dykem); }
+.op .top{ display:flex; align-items:baseline; gap:8px; }
+.op .tno{ font:600 13px var(--num); color:var(--surface); background:var(--dykem); border-radius:4px; padding:1px 6px; flex:none; }
+.op .name{ font:600 18px/1.15 var(--num); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.op .nav{ display:flex; align-items:center; gap:2px; color:var(--muted); font-size:12px; flex:none; }
+.op .nav button{ background:none; border:1px solid var(--line); border-radius:4px; width:22px; height:22px; cursor:pointer; line-height:1; }
+.op .meta{ color:var(--muted); font-size:12.5px; margin-top:3px; display:flex; flex-wrap:wrap; gap:2px 10px; align-items:center; }
+.op .meta b{ color:var(--ink); font-weight:600; }
+.op .meta input{ width:40px; padding:0 3px; border:1px solid var(--line); border-radius:4px; background:var(--bg); text-align:right; font:600 13px var(--num); }
+.op .meta .assumed{ color:var(--bronze); }
+.op.empty{ border-left-color:var(--line); color:var(--muted); }
+
+/* tabs */
+.tabs{ display:flex; border:1px solid var(--line); border-radius:7px; padding:2px; background:var(--surface); }
+.tabs button{ flex:1; border:0; background:none; border-radius:5px; padding:4px 0; cursor:pointer; color:var(--muted); font-weight:500; }
+.tabs button[aria-selected="true"]{ background:var(--dykem); color:var(--surface); }
+.tabs button:disabled{ opacity:.45; cursor:default; }
+
+/* limits */
+.lim .row{ display:flex; gap:6px; align-items:center; }
+.lim .row + .row, .lim .grid{ margin-top:7px; }
+.lim select{ flex:1; min-width:0; border:1px solid var(--line); border-radius:5px; background:var(--bg); padding:3px 5px; }
+.lim .lbl{ font-size:12px; color:var(--muted); flex:none; }
+.grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 8px; }
+.fld label{ display:block; font-size:11.5px; color:var(--muted); margin-bottom:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fld .box{ display:flex; align-items:center; gap:4px; }
+.fld input{ width:100%; min-width:0; text-align:right; border:1px solid var(--line); border-radius:5px; background:var(--bg); padding:2px 6px; font:600 15px var(--num); }
+.fld span{ font-size:11.5px; color:var(--muted); flex:none; }
+details{ margin-top:7px; }
+summary{ cursor:pointer; color:var(--muted); font-size:12.5px; list-style:none; }
+summary::before{ content:"▸ "; }
+details[open] summary::before{ content:"▾ "; }
+details .grid{ margin-top:6px; }
+.chk{ display:flex; gap:5px; align-items:center; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+.chk input{ accent-color:var(--dykem); }
+.btn{ border:1px solid var(--line); background:var(--bg); border-radius:5px; padding:3px 10px; cursor:pointer; font-size:12.5px; white-space:nowrap; }
+.btn.primary{ background:var(--dykem); border-color:var(--dykem); color:var(--surface); font-weight:600; }
+.btn.warn{ border-color:var(--bronze); color:var(--bronze); }
+.btn:disabled{ opacity:.45; cursor:default; }
+.locks{ display:flex; gap:12px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+
+/* compare table */
+table{ width:100%; border-collapse:collapse; }
+.cmp th{ font:500 11.5px var(--sans); color:var(--muted); text-align:right; padding:0 4px 3px; }
+.cmp th:first-child{ text-align:left; padding-left:0; }
+.cmp td{ padding:3px 4px; text-align:right; border-top:1px solid var(--line); white-space:nowrap; }
+.cmp td:first-child{ text-align:left; color:var(--muted); padding-left:0; }
+.cmp td.v{ font:600 16px var(--num); font-variant-numeric:tabular-nums; }
+.cmp td.v.best{ color:var(--dykem); }
+.cmp td.u{ color:var(--muted); font-size:11.5px; text-align:left; padding-left:0; }
+.cmp td input{ width:58px; text-align:right; border:1px solid var(--line); border-radius:4px; background:var(--bg); padding:0 4px; font:600 15px var(--num); }
+.cmp tr.hero td{ border-top:2px solid var(--line); }
+.cmp tr.hero td.v{ font-size:19px; }
+.gain{ font:600 13px var(--num); color:var(--good); }
+.gain.down{ color:var(--bronze); }
+.bar{ display:inline-block; vertical-align:middle; width:44px; height:6px; border-radius:3px; background:var(--bg); border:1px solid var(--line); overflow:hidden; margin-left:4px; }
+.bar i{ display:block; height:100%; background:var(--dykem); }
+.verdict{ margin-top:6px; font-size:12.5px; color:var(--muted); }
+.verdict b{ color:var(--ink); font-weight:600; }
+canvas{ display:block; width:100%; height:64px; margin-top:6px; border-radius:5px; background:var(--bg); border:1px solid var(--line); }
+.leg{ display:flex; gap:12px; font-size:11px; color:var(--muted); margin-top:3px; }
+.leg i{ display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:3px; margin-right:4px; }
+
+/* bulk table */
+.bulk{ display:flex; flex-direction:column; min-height:0; }
+.bulk .scroll{ overflow-y:auto; overflow-x:hidden; max-height:calc(100vh - 330px); min-height:80px; margin-top:6px; }
+.bt td, .bt th{ padding:4px 4px; text-align:right; white-space:nowrap; }
+.bt th{ font:500 11.5px var(--sans); color:var(--muted); position:sticky; top:0; background:var(--surface); }
+.bt td{ border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.bt td.l, .bt th.l{ text-align:left; }
+.bt{ table-layout:fixed; }
+.bt th:nth-child(1){ width:30px; } .bt th:nth-child(3), .bt th:nth-child(4){ width:46px; } .bt th:nth-child(5){ width:44px; } .bt th:nth-child(6){ width:72px; }
+.bt td.name{ overflow:hidden; text-overflow:ellipsis; }
+.bt td.why{ white-space:normal; line-height:1.3; }
+.bt td:last-child{ overflow:hidden; text-overflow:ellipsis; }
+.bt tr.okrow{ cursor:pointer; }
+.bt tr.okrow:hover td{ background:var(--row-hi); }
+.bt tr.skip td{ color:var(--muted); font-size:12px; }
+.bt .tn{ font:600 12px var(--num); color:var(--dykem); }
+.bt .q{ font:600 14px var(--num); }
+.sum{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--muted); margin-top:6px; }
+.sum b{ color:var(--ink); }
+
+/* status + footer */
+.msg{ font-size:12.5px; border-radius:6px; padding:6px 9px; background:var(--warn-bg); color:var(--warn-ink); }
+.msg:empty{ display:none; }
+.foot{ display:flex; gap:8px; align-items:center; margin-top:auto; padding-top:2px; }
+.foot a{ color:var(--dykem); font-size:12.5px; text-decoration:none; }
+.foot .sp{ flex:1; }
+.hidden{ display:none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <section class="card op empty" id="opcard" aria-live="polite">
+    <div class="top">
+      <span class="tno hidden" id="tno"></span>
+      <span class="name" id="opname">No operation selected</span>
+      <span class="nav hidden" id="nav"><button type="button" id="prev" aria-label="Previous operation">‹</button><span id="navpos"></span><button type="button" id="next" aria-label="Next operation">›</button></span>
+    </div>
+    <div class="meta" id="opmeta">Click an operation in the CAM browser. Select several, or a whole setup, to optimize them together.</div>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tabOne" aria-selected="true">This operation</button>
+    <button type="button" role="tab" id="tabAll" aria-selected="false">All selected</button>
+  </div>
+
+  <section class="card lim" aria-label="Limits">
+    <div class="row">
+      <span class="lbl">Material</span><select id="mat"></select>
+      <button type="button" class="btn warn hidden" id="matok" title="Save this material on the setup">Confirm</button>
+    </div>
+    <div class="grid">
+      <div class="fld"><label for="Fmax">Max force</label><div class="box"><input id="Fmax" class="num" inputmode="decimal"><span>N</span></div></div>
+      <div class="fld"><label for="slopeMax">Max force slope</label><div class="box"><input id="slopeMax" class="num" inputmode="decimal"><span>N/°</span></div></div>
+      <div class="fld"><label for="hexMax">Max chip</label><div class="box"><input id="hexMax" class="num" inputmode="decimal"><span>mm</span></div></div>
+    </div>
+    <details id="more">
+      <summary id="moresum">More limits</summary>
+      <div class="grid">
+        <div class="fld"><label for="nmax">Max spindle</label><div class="box"><input id="nmax" class="num" inputmode="decimal"><span>rpm</span></div></div>
+        <div class="fld"><label for="vfmax">Max feed</label><div class="box"><input id="vfmax" class="num" inputmode="decimal"><span>mm/min</span></div></div>
+        <div class="fld"><label for="hmMin">Min chip</label><div class="box"><input id="hmMin" class="num" inputmode="decimal"><span>mm</span></div></div>
+        <div class="fld"><label for="vcMin">Min v<sub>c</sub></label><div class="box"><input id="vcMin" class="num" inputmode="decimal"><span>m/min</span></div></div>
+        <div class="fld"><label for="vcMax">Max v<sub>c</sub></label><div class="box"><input id="vcMax" class="num" inputmode="decimal"><span>m/min</span></div></div>
+        <div class="fld"><label for="helixDefault">Helix if unknown</label><div class="box"><input id="helixDefault" class="num" inputmode="decimal"><span>°</span></div></div>
+        <div class="fld"><label for="pmax">Spindle power</label><div class="box"><input id="pmax" class="num" inputmode="decimal"><span>kW</span></div></div>
+        <div class="fld"><label for="eta">Efficiency</label><div class="box"><input id="eta" class="num" inputmode="decimal"></div></div>
+        <label class="chk" style="align-self:end"><input type="checkbox" id="usePow">Limit power</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="lbl">Profile</span><select id="lsel" aria-label="Limit profile"></select>
+        <button type="button" class="btn" id="lsave">Save as…</button>
+        <button type="button" class="btn" id="ldel">Delete</button>
+      </div>
+    </details>
+    <div class="locks">
+      <label class="chk"><input type="checkbox" id="keepAe">Keep stepover</label>
+      <label class="chk"><input type="checkbox" id="keepAp">Keep stepdown</label>
+    </div>
+  </section>
+
+  <div class="msg" id="msg" role="status"></div>
+
+  <!-- one operation -->
+  <section class="card" id="oneView" aria-label="Current and optimized cut">
+    <table class="cmp">
+      <thead><tr><th></th><th>Current</th><th>Optimized</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Spindle</td><td class="v num" id="c_n">–</td><td class="v num best" id="o_n">–</td><td class="u">rpm</td></tr>
+        <tr><td>Feed</td><td class="v num" id="c_vf">–</td><td class="v num best" id="o_vf">–</td><td class="u">mm/min</td></tr>
+        <tr><td>Stepover a<sub>e</sub></td><td class="v num"><input id="c_ae" inputmode="decimal" aria-label="Current stepover"></td><td class="v num best" id="o_ae">–</td><td class="u">mm</td></tr>
+        <tr><td>Stepdown a<sub>p</sub></td><td class="v num"><input id="c_ap" inputmode="decimal" aria-label="Current stepdown"></td><td class="v num best" id="o_ap">–</td><td class="u">mm</td></tr>
+        <tr><td>Feed/tooth f<sub>z</sub></td><td class="v num" id="c_fz">–</td><td class="v num best" id="o_fz">–</td><td class="u">mm</td></tr>
+        <tr class="hero"><td>Removal rate</td><td class="v num" id="c_q">–</td><td class="v num best" id="o_q">–</td><td class="u">cm³/min <span class="gain" id="gain"></span></td></tr>
+        <tr><td>Peak force</td><td class="v num" id="c_f">–</td><td class="v num best" id="o_f">–</td><td class="u">N<span class="bar"><i id="b_f"></i></span></td></tr>
+        <tr><td>Force slope</td><td class="v num" id="c_s">–</td><td class="v num best" id="o_s">–</td><td class="u">N/°<span class="bar"><i id="b_s"></i></span></td></tr>
+      </tbody>
+    </table>
+    <p class="verdict" id="verdict"></p>
+    <canvas id="curve" aria-label="Cutting force through one revolution, current and optimized"></canvas>
+    <div class="leg"><span><i style="border-color:var(--muted)"></i>Current</span><span><i style="border-color:var(--dykem)"></i>Optimized</span><span><i style="border-color:var(--bronze);border-top-style:dashed"></i>Force limit</span></div>
+  </section>
+
+  <!-- all selected -->
+  <section class="card bulk hidden" id="allView" aria-label="All selected operations">
+    <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span style="font-size:12.5px;color:var(--muted)">Bulk keeps each operation’s stepover and stepdown unless you untick the boxes above.</span>
+    </div>
+    <div class="scroll">
+      <table class="bt">
+        <thead><tr><th class="l">T</th><th class="l">Operation</th><th>Now</th><th>Best</th><th>Gain</th><th class="l">Limited by</th></tr></thead>
+        <tbody id="btbody"></tbody>
+      </table>
+    </div>
+    <div class="sum" id="bsum"></div>
+  </section>
+
+  <div class="foot">
+    <a href="index.html" id="full" title="Open the full calculator, with the stepover × depth map">Full calculator ↗</a>
+    <span class="sp"></span>
+    <button type="button" class="btn" id="apply" disabled title="Writing back to the operation comes in the next version">Apply (coming soon)</button>
+  </div>
+</div>
+
+<script src="optimizer.js"></script>
+<script>
+/* Compact optimizer panel for the djr_cutoptimizer Fusion add-in. Metric throughout.
+   MATERIALS mirrors the calculator's table (index.html); keep them in step. */
+const MATERIALS = {
+  "Aluminium (wrought)":[295,0.25], "Aluminium (cast)":[345,0.25], "Brass / bronze":[550,0.25],
+  "Copper":[900,0.25], "Grey cast iron (<200 HB)":[1020,0.25], "Nodular cast iron":[1350,0.25],
+  "Structural steel":[1780,0.21], "Carbon steel":[2000,0.21], "Alloy steel":[2260,0.20],
+  "Tool steel (hardened)":[2900,0.20], "Stainless (austenitic)":[2000,0.21], "Stainless (martensitic)":[2400,0.21],
+  "Titanium alloy":[1500,0.25], "Nickel superalloy":[2650,0.25], "Plastic":[180,0.22]
+};
+const DEFAULT_MAT = "Aluminium (wrought)";
+const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","nmax","vfmax","hmMin","vcMin","vcMax","helixDefault","pmax","eta"];
+const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", nmax:24000, vfmax:"", hmMin:0.005, vcMin:"", vcMax:"", helixDefault:35, pmax:2.2, eta:0.85 };
+const WORKING = "__working";          // auto-saved working limits; hidden from the profile list
+const STEP = 0.1;
+const $ = id => document.getElementById(id);
+const tok = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+let ops = [], idx = 0, mode = "one", results = {}, profilesStore = {}, overrides = {}, materialChoice = null;
+let runToken = 0;
+
+/* ---------- formatting ---------- */
+function f(v, d){ return isFinite(v) ? Number(v).toLocaleString(undefined, { minimumFractionDigits:d, maximumFractionDigits:d }) : "–"; }
+function g(v, s=3){ if(!isFinite(v)) return "–"; if(v === 0) return "0"; const d = Math.max(0, s - 1 - Math.floor(Math.log10(Math.abs(v)))); return f(v, Math.min(d, 4)); }
+function num(id){ const v = parseFloat($(id).value); return isFinite(v) ? v : undefined; }
+function esc(s){ return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])); }
+function setMsg(t){ $("msg").textContent = t || ""; }
+
+/* ---------- bridge ---------- */
+let FUSION = false;
+const hasFusion = () => !!(window.adsk && typeof window.adsk.fusionSendData === "function");
+function send(action, obj){
+  try{ return Promise.resolve(window.adsk.fusionSendData(action, JSON.stringify(obj || {}))).then(r => typeof r === "string" && r ? JSON.parse(r) : r); }
+  catch(e){ return Promise.reject(e); }
+}
+window.fusionJavaScriptHandler = {
+  handle(action, data){
+    try{
+      if(action === "selectionChanged") loadOps(JSON.parse(data));
+      else if(action === "fusionStatus") setMsg(JSON.parse(data).message || "");
+    }catch(e){ console.error("fusionJavaScriptHandler", action, e); }
+    return "OK";
+  }
+};
+
+/* ---------- limits ---------- */
+function readLimits(){
+  const L = {}; LIMIT_FIELDS.forEach(k => L[k] = num(k));
+  L.usePow = $("usePow").checked;
+  return L;
+}
+function writeLimits(L){
+  const src = Object.assign({}, DEFAULT_LIMITS, L || {});
+  LIMIT_FIELDS.forEach(k => { const v = src[k]; $(k).value = v === undefined || v === null || v === "" ? "" : v; });
+  $("usePow").checked = !!src.usePow;
+}
+function moreSummary(){
+  const L = readLimits(), parts = [];
+  if(L.nmax) parts.push(`${f(L.nmax,0)} rpm`);
+  if(L.vfmax) parts.push(`feed ≤ ${f(L.vfmax,0)}`);
+  if(L.hmMin) parts.push(`chip ≥ ${g(L.hmMin,2)}`);
+  if(L.usePow && L.pmax) parts.push(`${g(L.pmax,2)} kW`);
+  $("moresum").textContent = "More limits" + (parts.length ? ` · ${parts.join(" · ")}` : "");
+}
+function optimizerLimits(L){
+  const o = { nmax:L.nmax, Fmax:L.Fmax, slopeMax:L.slopeMax, vfmax:L.vfmax, hexMax:L.hexMax, hmMin:L.hmMin ?? 0, vcMin:L.vcMin, vcMax:L.vcMax };
+  if(L.usePow && L.pmax){ o.Pmax = L.pmax; o.eta = L.eta || 1; }
+  return o;
+}
+
+/* ---------- profiles (Python JSON file in Fusion, localStorage elsewhere) ---------- */
+const LKEY = "djr-cutopt-profiles";
+function loadProfiles(){
+  if(FUSION) return send("getLimits", {}).then(items => items && typeof items === "object" ? items : {}, () => ({}));
+  try{ return Promise.resolve(JSON.parse(localStorage.getItem(LKEY)) || {}); }catch(e){ return Promise.resolve({}); }
+}
+let saveTimer = null;
+function persistProfiles(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const items = JSON.parse(JSON.stringify(profilesStore));
+    if(FUSION) send("saveLimits", { items }).catch(() => setMsg("Couldn’t save limits in Fusion."));
+    else try{ localStorage.setItem(LKEY, JSON.stringify(items)); }catch(e){}
+  }, 300);
+}
+function renderProfiles(selected){
+  const sel = $("lsel"), keep = selected ?? sel.value;
+  sel.innerHTML = "";
+  const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "Working limits"; sel.appendChild(o0);
+  Object.keys(profilesStore).filter(n => !n.startsWith("__")).sort((a,b) => a.localeCompare(b)).forEach(n => {
+    const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o);
+  });
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
+  $("ldel").disabled = !sel.value;
+}
+function saveWorking(){
+  profilesStore[WORKING] = { limits: readLimits(), usePow: $("usePow").checked, helix: overrides };
+  persistProfiles();
+}
+
+/* ---------- operations ---------- */
+function opKey(p){ return p.id || `${p.setup}␟${p.operation}`; }
+function toolKey(p){ return `T${p.toolNumber ?? "?"}·${g(p.tool && p.tool.D, 4)}`; }
+function helixFor(p, L){
+  const o = overrides[toolKey(p)];
+  if(isFinite(o)) return { helix:o, assumed:false };
+  if(p.tool && p.tool.helix > 0) return { helix:p.tool.helix, assumed:false };
+  return { helix:L.helixDefault || 35, assumed:true };
+}
+function materialFor(p){
+  const m = materialChoice || p.material;
+  return MATERIALS[m] ? m : DEFAULT_MAT;
+}
+function toolOf(p, L){
+  const [kc1, mc] = MATERIALS[materialFor(p)];
+  return { D:p.tool.D, z:p.tool.z || 2, helix:helixFor(p, L).helix, kc1, mc, rake:0, kappa:90, fluteLen:p.tool.fluteLen };
+}
+function geomOverride(p){ return overrides["geom:" + opKey(p)] || {}; }
+function currentGeom(p){
+  const o = geomOverride(p);
+  return { ae: isFinite(o.ae) ? o.ae : p.op.ae, ap: isFinite(o.ap) ? o.ap : p.op.ap };
+}
+
+function currentCut(p, L){
+  const t = toolOf(p, L), { ae, ap } = currentGeom(p), n = p.op.n;
+  let fz = p.op.fz;
+  if(!(fz > 0) && p.op.vf > 0 && n > 0) fz = p.op.vf / (n * t.z);
+  if(!(ae > 0 && ap > 0 && n > 0 && fz > 0)) return null;
+  return CutOpt.describe(CutOpt.normTool(t), n, Math.min(ae, t.D), ap, fz, STEP);
+}
+
+function optimizeOp(p, L, bulk){
+  const t = toolOf(p, L), { ae, ap } = currentGeom(p);
+  const keepAe = $("keepAe").checked || p.kind === "slot";
+  const keepAp = $("keepAp").checked;
+  const opts = { apMax: t.fluteLen || undefined };
+  if(keepAe){ if(!(ae > 0)) return { ok:false, reason:"Stepover unknown. Enter it under Current, or untick Keep stepover." }; opts.aeLock = Math.min(ae, t.D); }
+  if(keepAp){ if(!(ap > 0)) return { ok:false, reason:"Stepdown unknown. Enter it under Current, or untick Keep stepdown." }; opts.apLock = ap; }
+  if(bulk){ opts.nAe = 20; opts.nAp = 20; }
+  try{ return CutOpt.optimize(t, optimizerLimits(L), opts); }
+  catch(e){ return { ok:false, reason:"Optimizer error: " + (e && e.message || e) }; }
+}
+
+function readable(){ return ops.filter(p => p.ok); }
+
+/* What each kind of operation keeps fixed by default. An adaptive is usually
+   programmed for full flute depth; a contour's or slot's stepover is set by the part. */
+const KEEP_DEFAULT = { adaptive:{ ae:false, ap:true }, face:{ ae:false, ap:true }, pocket:{ ae:false, ap:false },
+  contour:{ ae:true, ap:false }, slot:{ ae:true, ap:false } };
+function applyKeepDefaults(){
+  if(mode !== "one") return;
+  const p = ops[idx], d = (p && p.ok && KEEP_DEFAULT[p.kind]) || { ae:false, ap:false };
+  $("keepAe").checked = d.ae; $("keepAp").checked = d.ap;
+  $("keepAe").disabled = !!(p && p.kind === "slot");
+}
+
+/* Short reasons for the bulk table. */
+function shortReason(r){
+  if(/^No feasible cut/.test(r || "")) return "Too heavy for your limits at this stepover and stepdown, even at the minimum chip.";
+  return r;
+}
+
+/* ---------- load from Fusion ---------- */
+function loadOps(r){
+  if(!r || !r.ok){
+    if(!ops.length){ setMsg(r && r.reason || "Couldn’t read the selection."); renderCard(); }
+    else setMsg(r && r.reason || "");
+    return;
+  }
+  ops = r.ops || []; idx = Math.max(0, ops.findIndex(p => p.ok)); results = {}; materialChoice = null;
+  setMsg(r.note || "");
+  const many = ops.length > 1;
+  $("tabAll").disabled = !many;
+  $("tabAll").textContent = many ? `All selected (${ops.length})` : "All selected";
+  if(!many && mode === "all") setMode("one");
+  // bulk defaults to feeds & speeds only; one op defaults to free geometry
+  if(many && mode === "all"){ $("keepAe").checked = true; $("keepAp").checked = true; }
+  syncMaterial();
+  applyKeepDefaults();
+  renderCard();
+  schedule();
+}
+
+function syncMaterial(){
+  const set = new Set(readable().map(p => p.material || ""));
+  const known = [...set].filter(m => MATERIALS[m]);
+  const sel = $("mat");
+  sel.value = known.length === 1 && set.size === 1 ? known[0] : (known[0] || DEFAULT_MAT);
+  const unset = readable().some(p => !MATERIALS[p.material]);
+  $("matok").classList.toggle("hidden", !(unset && FUSION && readable().length));
+  sel.title = unset ? "Not saved on the setup yet: assumed. Pick the stock material and press Confirm." : "Saved on the setup";
+}
+
+/* ---------- render ---------- */
+function renderCard(){
+  const card = $("opcard"), p = ops[idx];
+  const many = ops.length > 1;
+  $("nav").classList.toggle("hidden", !many || mode !== "one");
+  $("navpos").textContent = many ? `${idx+1}/${ops.length}` : "";
+  if(!p){
+    card.classList.add("empty"); $("tno").classList.add("hidden");
+    $("opname").textContent = "No operation selected";
+    $("opmeta").textContent = "Click an operation in the CAM browser. Select several, or a whole setup, to optimize them together.";
+    return;
+  }
+  card.classList.remove("empty");
+  const tn = $("tno"); tn.classList.toggle("hidden", p.toolNumber == null); tn.textContent = "T" + (p.toolNumber ?? "");
+  if(mode === "all"){
+    $("opname").textContent = `${ops.length} operations`;
+    const setups = [...new Set(ops.map(o => o.setup).filter(Boolean))];
+    tn.classList.add("hidden");
+    $("opmeta").innerHTML = `Setup${setups.length > 1 ? "s" : ""} <b>${esc(setups.join(", "))}</b> · ${readable().length} can be optimized`;
+    return;
+  }
+  $("opname").textContent = p.operation;
+  $("opname").title = `${p.operation} — ${p.setup}`;
+  if(!p.ok){ $("opmeta").innerHTML = `${esc(p.strategyLabel || p.strategy)} · Setup <b>${esc(p.setup)}</b> · <span class="assumed">${esc(p.reason)}</span>`; return; }
+  const L = readLimits(), h = helixFor(p, L);
+  $("opmeta").innerHTML =
+    `<span>${esc(p.strategyLabel || p.strategy)}</span>` +
+    `<span><b>Ø${g(p.tool.D,3)}</b> mm · <b>${p.tool.z ?? "?"}</b> fl${p.tool.fluteLen ? ` · ${g(p.tool.fluteLen,3)} long` : ""}</span>` +
+    `<span>helix <input id="helix" class="num" value="${h.helix}" inputmode="decimal" aria-label="Helix angle">°${h.assumed ? ' <span class="assumed" title="This tool has no helix angle in Fusion">assumed</span>' : ""}</span>` +
+    `<span>Setup <b>${esc(p.setup)}</b></span>` +
+    (p.toolDesc ? `<span title="${esc(p.toolDesc)}">${esc(p.toolDesc.length > 28 ? p.toolDesc.slice(0,27) + "…" : p.toolDesc)}</span>` : "");
+  $("helix").addEventListener("change", e => {
+    const v = parseFloat(e.target.value);
+    if(isFinite(v) && v >= 0) overrides[toolKey(p)] = v; else delete overrides[toolKey(p)];
+    saveWorking(); results = {}; renderCard(); schedule();
+  });
+}
+
+function setCell(id, v, s){ $(id).textContent = typeof v === "string" ? v : g(v, s); }
+function renderOne(){
+  const p = ops[idx], L = readLimits();
+  const ids = ["c_n","c_vf","c_fz","c_q","c_f","c_s","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_f","o_s"];
+  ids.forEach(i => $(i).textContent = "–"); $("gain").textContent = ""; $("verdict").textContent = "";
+  $("b_f").style.width = "0"; $("b_s").style.width = "0";
+  if(!p || !p.ok){ $("c_ae").value = ""; $("c_ap").value = ""; drawCurve(null, null, L); return; }
+  const geo = currentGeom(p);
+  if(document.activeElement !== $("c_ae")) $("c_ae").value = geo.ae > 0 ? +g(geo.ae, 4).replace(/,/g,"") : "";
+  if(document.activeElement !== $("c_ap")) $("c_ap").value = geo.ap > 0 ? +g(geo.ap, 4).replace(/,/g,"") : "";
+  const R = results[opKey(p)] || {}, cur = R.cur, opt = R.opt;
+  if(cur){
+    setCell("c_n", f(cur.n,0)); setCell("c_vf", f(cur.vf,0)); setCell("c_fz", cur.fz, 3);
+    setCell("c_q", cur.Q, 3); setCell("c_f", cur.peak, 3); setCell("c_s", cur.robustSlope, 3);
+  } else {
+    setCell("c_n", p.op.n > 0 ? f(p.op.n,0) : "–"); setCell("c_vf", p.op.vf > 0 ? f(p.op.vf,0) : "–");
+  }
+  if(opt && opt.ok){
+    const b = opt.best;
+    setCell("o_n", f(b.n,0)); setCell("o_vf", f(b.vf,0)); setCell("o_ae", b.ae, 3); setCell("o_ap", b.ap, 3);
+    setCell("o_fz", b.fz, 3); setCell("o_q", b.Q, 3); setCell("o_f", b.peak, 3); setCell("o_s", b.robustSlope, 3);
+    if(L.Fmax) $("b_f").style.width = Math.min(100, b.peak / L.Fmax * 100) + "%";
+    if(L.slopeMax) $("b_s").style.width = Math.min(100, b.robustSlope / L.slopeMax * 100) + "%";
+    if(cur && cur.Q > 0){ const r = b.Q / cur.Q; $("gain").textContent = `×${f(r, 2)}`; $("gain").classList.toggle("down", r < 0.995);
+      $("gain").title = r < 0.995 ? "Slower than now: the current cut is over your limits" : "Removal rate compared with now"; }
+    let v = `Limited by <b>${esc(b.bindLabel)}</b>.`;
+    if(opt.snapped) v += " Depth sits just under a whole flute pitch, where force is smoothest.";
+    if(cur){
+      const over = CutOpt.checkLimits(cur, optimizerLimits(L), cur.n).map(x => CutOpt.LIMIT_LABEL[x.limit] || x.limit);
+      if(over.length) v += ` The current cut is over your ${[...new Set(over)].join(", ")} limit.`;
+    } else v += " Couldn’t read the current cut fully, so there’s nothing to compare.";
+    if(!(L.hexMax > 0) && b.hex > 0.008 * p.tool.D) v +=` Chip is ${g(b.hex,2)} mm thick; set Max chip for your tool.`;
+    if(helixFor(p, L).assumed && L.slopeMax) v += " Helix is assumed; check it for the slope limit.";
+    $("verdict").innerHTML = v;
+  } else if(opt){
+    $("verdict").innerHTML = `<b>No result:</b> ${esc(opt.reason)}`;
+  }
+  drawCurve(cur, opt && opt.ok ? opt.best : null, L);
+}
+
+function renderAll(){
+  const tb = $("btbody"); tb.innerHTML = "";
+  let n = 0, gainSum = 0, gainN = 0, pending = 0;
+  ops.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    const R = results[opKey(p)];
+    const tcell = `<td class="l tn">${p.toolNumber != null ? "T" + esc(p.toolNumber) : ""}</td>`;
+    const ncell = `<td class="l name" title="${esc(p.operation)} — ${esc(p.setup)}">${esc(p.operation)}</td>`;
+    if(!p.ok){ tr.className = "skip"; tr.innerHTML = tcell + ncell + `<td colspan="4" class="l why">${esc(p.reason)}</td>`; tb.appendChild(tr); return; }
+    if(!R){ pending++; tr.className = "skip"; tr.innerHTML = tcell + ncell + `<td colspan="4" class="l">…</td>`; tb.appendChild(tr); return; }
+    const opt = R.opt, cur = R.cur;
+    if(!opt.ok){ tr.className = "skip"; tr.innerHTML = tcell + ncell + `<td colspan="4" class="l why">${esc(shortReason(opt.reason))}</td>`; tb.appendChild(tr); return; }
+    const gain = cur && cur.Q > 0 ? opt.best.Q / cur.Q : NaN;
+    if(isFinite(gain)){ gainSum += gain; gainN++; }
+    n++;
+    tr.className = "okrow"; tr.title = "Open this operation";
+    tr.innerHTML = tcell + ncell + `<td class="q">${cur ? g(cur.Q,3) : "–"}</td><td class="q" style="color:var(--dykem)">${g(opt.best.Q,3)}</td>` +
+      `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td><td class="l" style="color:var(--muted)">${esc(opt.best.bindLabel)}</td>`;
+    tr.addEventListener("click", () => { idx = i; setMode("one"); });
+    tb.appendChild(tr);
+  });
+  $("bsum").innerHTML = pending ? `<span>Optimizing… ${ops.length - pending}/${ops.length}</span>` :
+    `<span><b>${n}</b> of ${ops.length} optimized · removal rate in cm³/min</span><span>${gainN ? `average <b class="gain">×${f(gainSum/gainN,2)}</b>` : ""}</span>`;
+}
+
+function render(){ moreSummary(); if(mode === "one") renderOne(); else renderAll(); }
+
+/* ---------- force curve ---------- */
+function drawCurve(cur, best, L){
+  const cv = $("curve"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 300, H = cv.clientHeight || 64;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const curves = [];
+  if(cur && cur.forces) curves.push([cur.forces, tok("--muted"), 1.5]);
+  if(best && best.forces) curves.push([best.forces, tok("--dykem"), 2]);
+  if(!curves.length) return;
+  const top = Math.max(...curves.map(c => Math.max(...c[0])), L.Fmax || 0) * 1.08 || 1, pad = 4;
+  const Y = v => H - pad - v/top*(H - 2*pad);
+  curves.forEach(([F, col, w]) => {
+    ctx.beginPath(); const n = F.length;
+    for(let i=0;i<=n;i++){ const x = W*i/n, y = Y(F[i % n]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineJoin = "round"; ctx.stroke();
+  });
+  if(L.Fmax){ ctx.setLineDash([5,4]); ctx.strokeStyle = tok("--bronze"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, Y(L.Fmax)); ctx.lineTo(W, Y(L.Fmax)); ctx.stroke(); ctx.setLineDash([]); }
+}
+
+/* ---------- running ---------- */
+let schedTimer = null;
+function schedule(){ clearTimeout(schedTimer); schedTimer = setTimeout(run, 120); render(); }
+function run(){
+  const token = ++runToken, L = readLimits();
+  const todo = mode === "one" ? (ops[idx] && ops[idx].ok ? [ops[idx]] : []) : readable();
+  let i = 0;
+  const step = () => {
+    if(token !== runToken) return;                       // superseded by a newer run
+    if(i >= todo.length){ render(); return; }
+    const p = todo[i++], k = opKey(p);
+    if(!results[k]) results[k] = { cur: currentCut(p, L), opt: optimizeOp(p, L, mode === "all") };
+    render();
+    setTimeout(step, 0);                                  // keep the panel responsive
+  };
+  step();
+}
+function invalidate(){ results = {}; schedule(); }
+
+function setMode(m){
+  mode = m;
+  $("tabOne").setAttribute("aria-selected", String(m === "one"));
+  $("tabAll").setAttribute("aria-selected", String(m === "all"));
+  $("oneView").classList.toggle("hidden", m !== "one");
+  $("allView").classList.toggle("hidden", m !== "all");
+  if(m === "all"){ $("keepAe").checked = true; $("keepAp").checked = true; $("keepAe").disabled = false; }
+  else applyKeepDefaults();
+  results = {}; renderCard(); schedule();
+}
+
+/* ---------- wiring ---------- */
+function init(){
+  const ms = $("mat");
+  Object.keys(MATERIALS).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = k; ms.appendChild(o); });
+  ms.value = DEFAULT_MAT;
+  writeLimits(DEFAULT_LIMITS);
+
+  LIMIT_FIELDS.forEach(k => $(k).addEventListener("change", () => { $("lsel").value = ""; saveWorking(); invalidate(); }));
+  $("usePow").addEventListener("change", () => { saveWorking(); invalidate(); });
+  ["keepAe","keepAp"].forEach(k => $(k).addEventListener("change", invalidate));
+  ["c_ae","c_ap"].forEach(k => $(k).addEventListener("change", e => {
+    const p = ops[idx]; if(!p || !p.ok) return;
+    const o = overrides["geom:" + opKey(p)] || (overrides["geom:" + opKey(p)] = {});
+    const v = parseFloat(e.target.value); o[k === "c_ae" ? "ae" : "ap"] = isFinite(v) && v > 0 ? v : undefined;
+    delete results[opKey(p)]; schedule();
+  }));
+  ms.addEventListener("change", () => {
+    materialChoice = ms.value; invalidate();
+    if(FUSION && readable().length) confirmMaterial();
+  });
+  $("matok").addEventListener("click", confirmMaterial);
+  $("tabOne").addEventListener("click", () => setMode("one"));
+  $("tabAll").addEventListener("click", () => { if(ops.length > 1) setMode("all"); });
+  $("prev").addEventListener("click", () => { idx = (idx - 1 + ops.length) % ops.length; applyKeepDefaults(); invalidate(); renderCard(); });
+  $("next").addEventListener("click", () => { idx = (idx + 1) % ops.length; applyKeepDefaults(); invalidate(); renderCard(); });
+  $("lsel").addEventListener("change", () => {
+    const pr = profilesStore[$("lsel").value]; $("ldel").disabled = !$("lsel").value;
+    if(pr){ writeLimits(Object.assign({}, pr.limits, { usePow: pr.usePow })); saveWorking(); invalidate(); }
+  });
+  $("lsave").addEventListener("click", () => {
+    const name = (prompt("Name these limits (e.g. LemonTart · 6061 · 6 mm):", $("lsel").value || "") || "").trim();
+    if(!name || name.startsWith("__")) return;
+    profilesStore[name] = { limits: readLimits(), usePow: $("usePow").checked };
+    renderProfiles(name); persistProfiles(); setMsg(`Saved limits “${name}”.`);
+  });
+  $("ldel").addEventListener("click", () => {
+    const n = $("lsel").value; if(!n || !confirm(`Delete the limits “${n}”?`)) return;
+    delete profilesStore[n]; renderProfiles(""); persistProfiles();
+  });
+  window.addEventListener("resize", () => { if(mode === "one") renderOne(); });
+
+  FUSION = hasFusion();
+  start();
+  if(!FUSION) setTimeout(() => { if(!FUSION && hasFusion()){ FUSION = true; start(); } }, 800);
+}
+
+function confirmMaterial(){
+  const m = $("mat").value, setups = [...new Set(readable().map(p => p.setup))];
+  send("setMaterial", { material:m, setups }).then(r => {
+    if(r && r.ok){ readable().forEach(p => p.material = m); materialChoice = null; syncMaterial(); setMsg(`Material saved on ${r.setups.length > 1 ? "setups" : "setup"} ${r.setups.join(", ")}.`); }
+    else setMsg(r && r.reason || "Couldn’t save the material.");
+  }, () => setMsg("Couldn’t reach Fusion."));
+}
+
+function start(){
+  loadProfiles().then(items => {
+    profilesStore = items || {};
+    const w = profilesStore[WORKING];
+    if(w){ writeLimits(Object.assign({}, w.limits, { usePow: w.usePow })); overrides = Object.assign({}, w.helix || {}); }
+    renderProfiles();
+    moreSummary();
+    if(FUSION) send("readOps", {}).then(loadOps, () => setMsg("Couldn’t reach Fusion."));
+    else { setMsg("Open this panel from Fusion’s Manufacture workspace to read operations."); render(); }
+  });
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

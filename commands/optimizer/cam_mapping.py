@@ -29,6 +29,41 @@ TOOL_NAMES = {
     'helix':    ['tool_helixAngle'],
     'type':     ['tool_type'],
 }
+# Text fields shown on the operation card (not used in the math).
+TOOL_TEXT = {
+    'number':      ['tool_number'],
+    'description': ['tool_description', 'tool_comment'],
+}
+STRATEGY_LABEL = {
+    'adaptive2d': '2D Adaptive', 'adaptive': '3D Adaptive', 'contour2d': '2D Contour', 'pocket2d': '2D Pocket',
+    'slot': 'Slot', 'face': 'Face', 'contour': '3D Contour', 'pocket': '3D Pocket', 'drill': 'Drill',
+    'bore': 'Bore', 'circular': 'Circular', 'thread': 'Thread', 'chamfer2d': 'Chamfer', 'engrave': 'Engrave',
+    'parallel': 'Parallel', 'scallop': 'Scallop', 'pencil': 'Pencil', 'radial': 'Radial', 'spiral': 'Spiral',
+    'morphed_spiral': 'Morphed Spiral', 'steep_and_shallow': 'Steep and Shallow', 'flow': 'Flow',
+    'contour3d': '3D Contour',
+}
+
+
+def strategy_label(strategy: str) -> str:
+    s = (strategy or '').lower()
+    return STRATEGY_LABEL.get(s, strategy or '?')
+
+
+def read_text(params: dict, names: list) -> Optional[str]:
+    """A text or integer parameter as display text: quotes stripped, '12.0' -> '12'."""
+    for name in names:
+        if name not in params:
+            continue
+        expr, internal = params[name]
+        if isinstance(expr, str) and expr.strip():
+            t = expr.strip().strip('\'"').strip()
+            if t:
+                return t
+        if isinstance(internal, (int, float)) and not isinstance(internal, bool):
+            return str(int(internal)) if float(internal).is_integer() else str(internal)
+        if isinstance(internal, str) and internal.strip():
+            return internal.strip()
+    return None
 
 # What kind of quantity each field is, for unit parsing.
 KIND = {'n': 'rpm', 'vf': 'feed', 'fz': 'len', 'vc': 'speed', 'ae': 'len', 'ap': 'len',
@@ -118,8 +153,11 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
                   material: Optional[str] = None) -> dict:
     """Everything the palette needs to fill in the calculator, or a reason it can't."""
     ok, kind_or_reason = strategy_status(strategy)
+    label = strategy_label(strategy)
+    card = {k: read_text(tool_params, names) for k, names in TOOL_TEXT.items()}
     if not ok:
-        return {'ok': False, 'reason': kind_or_reason, 'operation': op_name, 'strategy': strategy}
+        return {'ok': False, 'reason': kind_or_reason, 'operation': op_name, 'strategy': strategy,
+                'strategyLabel': label, 'toolNumber': card['number']}
 
     tool = {k: read_value(tool_params, names, KIND.get(k, 'len')) for k, names in TOOL_NAMES.items() if k != 'type'}
     op = {k: read_value(op_params, names, KIND[k]) for k, names in OP_NAMES.items()}
@@ -138,7 +176,8 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
         op['fz'] = op['vf'] / (op['n'] * tool['z'])
 
     missing = [k for k in ('D', 'z') if tool.get(k) is None] + [k for k in ('n', 'vf', 'ae', 'ap') if op.get(k) is None]
-    return {'ok': True, 'operation': op_name, 'strategy': strategy, 'kind': kind_or_reason,
+    return {'ok': True, 'operation': op_name, 'strategy': strategy, 'strategyLabel': label, 'kind': kind_or_reason,
+            'toolNumber': card['number'], 'toolDesc': card['description'],
             'tool': tool, 'op': op, 'material': material, 'missing': missing}
 
 
