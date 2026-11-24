@@ -5,7 +5,7 @@ optimizer panel (web/panel.html) and keeps it in step with the CAM selection.
 Bridge:
   JS -> Python: adsk.fusionSendData(action, json)  -> incomingFromHTML (returnData answers)
   Python -> JS: palette.sendInfoToHTML(action, json) -> window.fusionJavaScriptHandler.handle
-Actions from the page: ready, readOps, getLimits, saveLimits, setMaterial.
+Actions from the page: ready, readOps, getLimits, saveLimits, setMaterial, apply, revert.
 Actions to the page:   selectionChanged (same shape as readOps), fusionStatus.
 """
 from __future__ import annotations
@@ -45,6 +45,10 @@ def _safe(fn, default=None):
         return default
 
 
+def _op_id(setup_name: str, op_name: str) -> str:
+    return f'{setup_name}␟{op_name}'
+
+
 def _children_ops(container):
     """All operations under a setup, folder or pattern."""
     ops = _safe(lambda: container.allOperations)
@@ -59,6 +63,8 @@ class OptimizerCommand:
     _palette_handlers = []
     _selection_handler = None
     _setups: dict = {}            # setup name -> setup, from the last read (for setMaterial)
+    _ops: dict = {}               # op id -> operation, from the last read (for apply)
+    _last_apply: list = []        # [{id, op, snap}] from the last apply (for revert)
 
     # ------------------------------------------------------------------ setup
     @classmethod
@@ -98,7 +104,7 @@ class OptimizerCommand:
         if palette:
             palette.deleteMe()
         cls._palette_handlers = []
-        cls._setups = {}
+        cls._setups, cls._ops, cls._last_apply = {}, {}, []
 
     @staticmethod
     def _panel(ui):
@@ -167,6 +173,10 @@ class OptimizerCommand:
                 args.returnData = json.dumps({'ok': False, 'reason': str(e)})
         elif action == 'setMaterial':
             args.returnData = json.dumps(cls.set_material(data.get('material'), data.get('setups')))
+        elif action == 'apply':
+            args.returnData = json.dumps(cls.apply(data.get('items'), data.get('clearance')))
+        elif action == 'revert':
+            args.returnData = json.dumps(cls.revert())
         else:
             args.returnData = json.dumps({'ok': False, 'reason': f'unknown action {action}'})
 
@@ -230,7 +240,8 @@ class OptimizerCommand:
             cam_mapping.params_to_dict(tool.parameters),
             op_name=name, material=material)
         payload['setup'] = setup_name
-        payload['id'] = f'{setup_name}\u241f{name}'
+        payload['id'] = _op_id(setup_name, name)
+        cls._ops[payload['id']] = op
         return payload
 
     @classmethod
@@ -244,7 +255,7 @@ class OptimizerCommand:
             if not ops:
                 return {'ok': False, 'empty': True, 'ops': [],
                         'reason': 'Select an operation in the CAM browser. Select several, or a whole setup, to optimize them together.'}
-            cls._setups = {}
+            cls._setups, cls._ops = {}, {}
             out = [cls._read_op(op) for op in ops[:MAX_OPS]]
             result = {'ok': True, 'ops': out}
             if len(ops) > MAX_OPS:
@@ -280,3 +291,139 @@ class OptimizerCommand:
         except Exception:
             Utils.handleError('set_material')
             return {'ok': False, 'reason': 'Couldn’t save the material on the setup.'}
+
+    # ---------------------------------------------------------------- writing
+    @classmethod
+    def _find_op(cls, cam, op_id):
+        op = cls._ops.get(op_id)
+        if op is not None and _safe(lambda: op.isValid, True):
+            return op
+        all_ops = _safe(lambda: cam.allOperations)
+        for i in range(_safe(lambda: all_ops.count, 0) or 0):
+            o = all_ops.item(i)
+            if _op_id(_safe(lambda: o.parentSetup.name, ''), _safe(lambda: o.name, '')) == op_id:
+                return o
+        return None
+
+    @staticmethod
+    def _restore(op, snap):
+        """Put parameters back as they were, newest write first."""
+        for name, kind, old_expr, old_value in reversed(snap):
+            p = _safe(lambda: op.parameters.itemByName(name))
+            if p is None:
+                continue
+            if kind == 'bool':
+                _safe(lambda: setattr(p.value, 'value', bool(old_value)))
+            else:
+                _safe(lambda: setattr(p, 'expression', old_expr))
+
+    @staticmethod
+    def _write_one(op, name, expr, kind, target, snap):
+        """Write one parameter and read it back. Returns an error message, or None."""
+        p = _safe(lambda: op.parameters.itemByName(name))
+        if p is None:
+            return f'parameter {name} not found'
+        if _safe(lambda: p.isEditable, True) is False:
+            return f'{name} isn’t editable (is it locked or driven by another setting?)'
+        old_expr, old_value = _safe(lambda: p.expression, ''), _safe(lambda: p.value.value)
+        snap.append((name, kind, old_expr, old_value))
+        try:
+            if kind == 'bool':
+                p.value.value = bool(target)
+            else:
+                p.expression = expr
+        except Exception as e:
+            return f'Fusion refused {name} = {expr} ({e})'
+        new_expr, new_value = _safe(lambda: p.expression, ''), _safe(lambda: p.value.value)
+        if not cam_mapping.write_matches(kind, target, new_expr, new_value):
+            return f'{name} reads back as “{new_expr}” instead of {expr}'
+        return None
+
+    @classmethod
+    def _generate(cls, cam, op_list) -> bool:
+        try:
+            coll = adsk.core.ObjectCollection.create()
+            for op in op_list:
+                coll.add(op)
+            cam.generateToolpath(coll)
+            return True
+        except Exception:
+            Utils.handleError('generateToolpath')
+            return False
+
+    @classmethod
+    def apply(cls, items, clearance) -> dict:
+        """Write the panel's feeds and speeds (and finishing stock) to operations, then
+        regenerate them. Each op is all-or-nothing: on any failure it is put back."""
+        try:
+            cam, reason = cls._cam()
+            if cam is None:
+                return {'ok': False, 'reason': reason, 'results': []}
+            if not isinstance(items, list) or not items:
+                return {'ok': False, 'reason': 'Nothing to apply.', 'results': []}
+            results, changed, undo = [], [], []
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                op_id = str(it.get('id', ''))
+                res = {'id': op_id, 'ok': False}
+                results.append(res)
+                op = cls._find_op(cam, op_id)
+                if op is None:
+                    res['reason'] = 'Operation not found. Was it renamed or deleted? Reselect it.'
+                    continue
+                payload = cls._read_op(op)              # fresh read: where each value lives now
+                if not payload.get('ok'):
+                    res['reason'] = payload.get('reason', 'Couldn’t read the operation.')
+                    continue
+                try:
+                    plan = cam_mapping.plan_writes(payload['src'], it, clearance, payload.get('stockSrc'))
+                except ValueError as e:
+                    res['reason'] = str(e)
+                    continue
+                snap, err = [], None
+                for name, expr, kind, target in plan:
+                    err = cls._write_one(op, name, expr, kind, target, snap)
+                    if err:
+                        break
+                if err:
+                    cls._restore(op, snap)
+                    res['reason'] = err[:1].upper() + err[1:] + '. Put back as it was.'
+                    continue
+                res.update(ok=True, written=[f'{name} = {expr}' for name, expr, _, _ in plan])
+                undo.append({'id': op_id, 'op': op, 'snap': snap})
+                changed.append(op)
+            if undo:
+                cls._last_apply = undo
+            generating = cls._generate(cam, changed) if changed else False
+            n_ok = len(changed)
+            return {'ok': n_ok > 0, 'results': results, 'applied': n_ok, 'failed': len(results) - n_ok,
+                    'generating': generating, 'canRevert': bool(cls._last_apply),
+                    'reason': '' if n_ok else 'No operation was changed.'}
+        except Exception:
+            Utils.handleError('apply')
+            return {'ok': False, 'reason': 'Apply failed. See the Text Command window for details.', 'results': []}
+
+    @classmethod
+    def revert(cls) -> dict:
+        """Undo the last apply: every parameter it wrote goes back to its old expression."""
+        try:
+            if not cls._last_apply:
+                return {'ok': False, 'reason': 'Nothing to revert.'}
+            cam, reason = cls._cam()
+            done = []
+            for entry in cls._last_apply:
+                op = entry['op'] if _safe(lambda: entry['op'].isValid, True) else (
+                    cls._find_op(cam, entry['id']) if cam else None)
+                if op is None:
+                    continue
+                cls._restore(op, entry['snap'])
+                done.append(op)
+            cls._last_apply = []
+            if cam is not None and done:
+                cls._generate(cam, done)
+            return {'ok': bool(done), 'reverted': len(done),
+                    'reason': '' if done else 'The operations from the last apply are gone.'}
+        except Exception:
+            Utils.handleError('revert')
+            return {'ok': False, 'reason': 'Revert failed. See the Text Command window for details.'}

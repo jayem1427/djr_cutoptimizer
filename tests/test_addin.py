@@ -80,6 +80,15 @@ def _install_fake_adsk():
         def cast(obj):
             return obj
 
+    class ObjectCollection(list):
+        @staticmethod
+        def create():
+            return ObjectCollection()
+
+        def add(self, x):
+            self.append(x)
+
+    core.ObjectCollection = ObjectCollection
     cam.CAM = CAM
     cam.Operation = Operation
     adsk.core, adsk.cam = core, cam
@@ -94,8 +103,25 @@ import sync_web  # noqa: E402
 
 
 class _Param:
-    def __init__(self, name, expression, value):
-        self.name, self.expression, self.value = name, expression, types.SimpleNamespace(value=value)
+    """A CAM parameter. Setting `expression` behaves like Fusion: the value follows, and an
+    expression in `refuse` raises (as Fusion does for a bad unit)."""
+    refuse = set()
+
+    def __init__(self, name, expression, value, editable=True):
+        self.name, self._expr, self.value, self.isEditable = name, expression, types.SimpleNamespace(value=value), editable
+
+    @property
+    def expression(self):
+        return self._expr
+
+    @expression.setter
+    def expression(self, e):
+        if e in _Param.refuse:
+            raise RuntimeError('bad expression')
+        self._expr = e
+        num = cam_mapping.parse_quantity(e, 'len')
+        if num is not None:
+            self.value.value = num / 10.0          # internal cm, like Fusion
 
 
 class _Params:
@@ -108,6 +134,12 @@ class _Params:
 
     def item(self, i):
         return self._rows[i]
+
+    def itemByName(self, name):
+        return next((p for p in self._rows if p.name == name), None)
+
+    def expr(self, name):
+        return self.itemByName(name).expression
 
 
 class _Attrs:
@@ -155,8 +187,16 @@ def _fake_op(strategy='adaptive2d', tool_rows=None, op_rows=None, name='Adaptive
 
 
 def _cam_doc():
-    cam = types.SimpleNamespace(is_cam=True)
-    return types.SimpleNamespace(products=types.SimpleNamespace(itemByProductType=lambda t: cam))
+    cam = types.SimpleNamespace(is_cam=True, generated=[])
+    cam.generateToolpath = lambda coll: cam.generated.extend(coll)
+    return types.SimpleNamespace(products=types.SimpleNamespace(itemByProductType=lambda t: cam), cam=cam)
+
+
+# An op with stock-to-leave parameters (names as the mapping expects them).
+_FINISH_ROWS = [
+    ('tool_spindleSpeed', '18000 rpm', 18000), ('tool_feedCutting', '1500 mm/min', 150.0),
+    ('optimalLoad', '0.5 mm', 0.05), ('maximumStepdown', '10 mm', 1.0),
+    ('stockToLeave', 'false', False), ('radialStockToLeave', '0.3 mm', 0.03), ('axialStockToLeave', '0.2 mm', 0.02)]
 
 
 # ----------------------------------------------------------------------- tests
@@ -313,6 +353,154 @@ class ReadOps(unittest.TestCase):
         self.assertTrue(r['ok'])
         self.assertEqual(sorted(r['setups']), ['S1', 'S2'])
         self.assertEqual([p['material'] for p in OptimizerCommand.read_ops()['ops']], ['Aluminium (wrought)'] * 2)
+
+
+class PlanWrites(unittest.TestCase):
+    SRC = {'n': 'tool_spindleSpeed', 'vf': 'tool_feedCutting', 'ae': 'optimalLoad', 'ap': 'maximumStepdown'}
+    STOCK = {'radial': 'radialStockToLeave', 'axial': 'axialStockToLeave', 'flag': 'stockToLeave'}
+
+    def test_rough_writes_rpm_and_feed_only(self):
+        w = cam_mapping.plan_writes(self.SRC, {'n': 17999.7, 'vf': 3456.9, 'pass': 'rough'}, 0.05, self.STOCK)
+        self.assertEqual([(n, e) for n, e, _, _ in w],
+                         [('tool_spindleSpeed', '17999 rpm'), ('tool_feedCutting', '3456 mm/min')])   # rounded down
+
+    def test_rough_with_geometry(self):
+        w = cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 3000, 'ae': 0.61234, 'ap': 12}, 0.05)
+        self.assertIn(('optimalLoad', '0.6123 mm'), [(n, e) for n, e, _, _ in w])
+        self.assertIn(('maximumStepdown', '12 mm'), [(n, e) for n, e, _, _ in w])
+
+    def test_wall_finish_leaves_clearance_on_floor(self):
+        w = {n: e for n, e, _, _ in cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'wall'}, 0.05, self.STOCK)}
+        self.assertEqual(w['radialStockToLeave'], '0 mm')
+        self.assertEqual(w['axialStockToLeave'], '0.05 mm')
+        self.assertEqual(w['stockToLeave'], 'true')
+        self.assertNotIn('optimalLoad', w)                  # finish passes never change the engagement
+
+    def test_floor_finish_leaves_clearance_on_wall(self):
+        w = {n: e for n, e, _, _ in cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'floor'}, 0.05, self.STOCK)}
+        self.assertEqual(w['radialStockToLeave'], '0.05 mm')
+        self.assertEqual(w['axialStockToLeave'], '0 mm')
+
+    def test_refuses_rather_than_half_apply(self):
+        P = cam_mapping.plan_writes
+        with self.assertRaises(ValueError):
+            P(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'wall'}, 0.05, {'radial': None, 'axial': None})
+        with self.assertRaises(ValueError):
+            P(dict(self.SRC, ae=None), {'n': 18000, 'vf': 2000, 'ae': 1.0}, 0.05)
+        with self.assertRaises(ValueError):
+            P(self.SRC, {'n': 0, 'vf': 2000}, 0.05)
+        with self.assertRaises(ValueError):
+            P(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'chamfer'}, 0.05)
+        with self.assertRaises(ValueError):
+            P(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'wall'}, -1, self.STOCK)
+
+    def test_write_matches(self):
+        M = cam_mapping.write_matches
+        self.assertTrue(M('rpm', 18000, '18000 rpm', 18000))
+        self.assertTrue(M('feed', 2000, '2000 mm/min', 200))
+        self.assertTrue(M('feed', 2540, '100 in/min', None))
+        self.assertFalse(M('feed', 2000, '200 mm/min', 20))
+        self.assertTrue(M('len', 0.0, '0 mm', 0.0))
+        self.assertFalse(M('len', 0.05, '0.5 mm', 0.05))
+        self.assertTrue(M('bool', True, 'true', True))
+        self.assertFalse(M('bool', True, 'false', False))
+
+
+class Apply(unittest.TestCase):
+    def setUp(self):
+        _Param.refuse = set()
+        _State.document = _cam_doc()
+        OptimizerCommand._last_apply = []
+
+    def _select(self, *ops):
+        _State.selections = list(ops)
+        r = OptimizerCommand.read_ops()
+        self.assertTrue(r['ok'], r)
+        return {p['operation']: p for p in r['ops']}
+
+    def test_payload_has_sources_and_stock(self):
+        p = self._select(_fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall'))['Wall']
+        self.assertEqual(p['src']['ae'], 'optimalLoad')
+        self.assertAlmostEqual(p['stock']['radial'], 0.3)
+        self.assertEqual(p['stockSrc'], {'radial': 'radialStockToLeave', 'axial': 'axialStockToLeave', 'flag': 'stockToLeave'})
+        json.dumps(p)
+
+    def test_apply_wall_finish_and_revert(self):
+        op = _fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall')
+        p = self._select(op)['Wall']
+        r = OptimizerCommand.apply([{'id': p['id'], 'n': 20000, 'vf': 2400.6, 'pass': 'wall'}], 0.05)
+        self.assertTrue(r['ok'], r)
+        self.assertEqual(r['applied'], 1)
+        self.assertTrue(r['generating'])
+        self.assertEqual(_State.document.cam.generated, [op])
+        P = op.parameters
+        self.assertEqual(P.expr('tool_spindleSpeed'), '20000 rpm')
+        self.assertEqual(P.expr('tool_feedCutting'), '2400 mm/min')
+        self.assertEqual(P.expr('radialStockToLeave'), '0 mm')
+        self.assertEqual(P.expr('axialStockToLeave'), '0.05 mm')
+        self.assertIs(P.itemByName('stockToLeave').value.value, True)
+        self.assertEqual(P.expr('optimalLoad'), '0.5 mm')        # engagement untouched
+
+        rv = OptimizerCommand.revert()
+        self.assertTrue(rv['ok'], rv)
+        self.assertEqual(P.expr('tool_spindleSpeed'), '18000 rpm')
+        self.assertEqual(P.expr('radialStockToLeave'), '0.3 mm')
+        self.assertIs(P.itemByName('stockToLeave').value.value, False)
+        self.assertFalse(OptimizerCommand.revert()['ok'])        # nothing left to revert
+
+    def test_failed_write_puts_the_op_back(self):
+        op = _fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall')
+        p = self._select(op)['Wall']
+        _Param.refuse = {'0.05 mm'}                                  # Fusion refuses the last write
+        r = OptimizerCommand.apply([{'id': p['id'], 'n': 20000, 'vf': 2400, 'pass': 'wall'}], 0.05)
+        self.assertFalse(r['ok'])
+        self.assertIn('Fusion refused axialStockToLeave', r['results'][0]['reason'])
+        self.assertIn('Put back', r['results'][0]['reason'])
+        self.assertEqual(op.parameters.expr('tool_spindleSpeed'), '18000 rpm')
+        self.assertEqual(op.parameters.expr('radialStockToLeave'), '0.3 mm')
+        self.assertIs(op.parameters.itemByName('stockToLeave').value.value, False)
+        self.assertEqual(_State.document.cam.generated, [])
+
+    def test_locked_parameter_is_reported(self):
+        rows = [r for r in _FINISH_ROWS if r[0] != 'tool_feedCutting'] + [('tool_feedCutting', '1500 mm/min', 150.0, False)]
+        op = _fake_op('adaptive2d', op_rows=rows, name='R')
+        p = self._select(op)['R']
+        r = OptimizerCommand.apply([{'id': p['id'], 'n': 20000, 'vf': 2400}], 0.05)
+        self.assertFalse(r['ok'])
+        self.assertIn('editable', r['results'][0]['reason'])
+        self.assertEqual(op.parameters.expr('tool_spindleSpeed'), '18000 rpm')
+
+    def test_finish_without_stock_params_is_refused_but_others_apply(self):
+        rough = _fake_op('adaptive2d', name='Rough')                 # default rows: no stock params
+        wall = _fake_op('contour2d', name='Wall')
+        ps = self._select(rough, wall)
+        r = OptimizerCommand.apply([{'id': ps['Rough']['id'], 'n': 20000, 'vf': 5000, 'pass': 'rough'},
+                                    {'id': ps['Wall']['id'], 'n': 20000, 'vf': 2000, 'pass': 'wall'}], 0.05)
+        self.assertEqual(r['applied'], 1)
+        self.assertEqual(r['failed'], 1)
+        self.assertIn('stock-to-leave', r['results'][1]['reason'])
+        self.assertEqual(rough.parameters.expr('tool_spindleSpeed'), '20000 rpm')
+        self.assertEqual(wall.parameters.expr('tool_spindleSpeed'), '24000 rpm')
+
+    def test_unknown_op_and_bad_input(self):
+        self._select(_fake_op())
+        r = OptimizerCommand.apply([{'id': 'nope␟gone', 'n': 1, 'vf': 1}], 0.05)
+        self.assertIn('not found', r['results'][0]['reason'])
+        self.assertFalse(OptimizerCommand.apply([], 0.05)['ok'])
+        self.assertFalse(OptimizerCommand.apply(None, 0.05)['ok'])
+
+    def test_bridge_actions(self):
+        op = _fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall')
+        p = self._select(op)['Wall']
+        args = types.SimpleNamespace(action='apply', returnData='',
+                                     data=json.dumps({'items': [{'id': p['id'], 'n': 19000, 'vf': 2000, 'pass': 'floor'}], 'clearance': 0.05}))
+        OptimizerCommand.onHTML(args)
+        self.assertTrue(json.loads(args.returnData)['ok'])
+        self.assertEqual(op.parameters.expr('radialStockToLeave'), '0.05 mm')
+        args = types.SimpleNamespace(action='revert', returnData='', data='')
+        OptimizerCommand.onHTML(args)
+        self.assertTrue(json.loads(args.returnData)['ok'])
+        self.assertEqual(op.parameters.expr('radialStockToLeave'), '0.3 mm')
 
 
 class Profiles(unittest.TestCase):

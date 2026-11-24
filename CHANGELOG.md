@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.4.0 — 2026-11-23
+
+**Apply.** Select operations, mark each one Rough, Wall finish or Floor finish, and write the suggested feeds and speeds back to them in one go.
+
+### New
+- **Apply / Apply to N ops** writes spindle speed and cutting feed to the operation, then regenerates the toolpaths. Click once to arm it, then again within 4 s to confirm. It covers the current operation in *This operation* and every optimized row in *All selected*.
+- **Pass type per operation:** Rough, Wall finish or Floor finish. It's on the card and in a new *Pass* column in the bulk table. The default comes from the operation: a contour is a wall finish; a name containing "floor", "wall", "rough" or "finish" decides it; everything else is rough.
+- **Finishing rule.** Apply sets stock to leave on finish passes. A wall finish gets 0 radial and **0.05 mm axial**, so it stays off the floor. A floor finish gets **0.05 mm radial** and 0 axial, so it stays off the walls. The 0.05 mm is *Finish clearance* under More limits.
+- **Finish passes keep their engagement** and only optimize rpm and feed, under a tighter **Finish deflection** limit (0.01 mm by default). A wall finish's stepover defaults to the radial stock that the selected roughing ops in the same setup leave. A floor finish's stepdown defaults to their axial stock. Type over either under *Current*.
+- **Revert** puts back every value the last Apply changed, then regenerates.
+
+### Safety
+- Each write is read back. If Fusion refuses a value or it reads back differently, that operation is put back exactly as it was, and the panel says why. The other operations still apply.
+- An operation is never half-applied. If the stock-to-leave parameters or a stepover/stepdown being written can't be found, nothing on that operation changes.
+- Rough passes write stepover/stepdown only when the optimizer was allowed to change them (Keep unticked) or you typed a value under *Current*. Ramp, plunge and lead feeds aren't touched.
+- rpm and feed are rounded **down**, so a written value is never over a limit.
+
+### Changed
+- Apply and Revert results show in the footer, so the panel doesn't start scrolling. Problems still show in the message box.
+
 ## v0.3.0 — 2026-11-23
 
 Chip limits by material, tool deflection, and the force graph back in its familiar style. The full calculator is gone from the add-in.

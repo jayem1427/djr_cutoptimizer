@@ -51,6 +51,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .op .meta input{ width:40px; padding:0 3px; border:1px solid var(--line); border-radius:4px; background:var(--bg); text-align:right; font:600 13px var(--num); }
 .op .meta .assumed{ color:var(--bronze); }
 .op.empty{ border-left-color:var(--line); color:var(--muted); }
+.passrow{ display:flex; align-items:center; gap:7px; margin-top:6px; font-size:12px; color:var(--muted); }
+.seg{ display:inline-flex; flex:none; border:1px solid var(--line); border-radius:6px; padding:1px; background:var(--bg); }
+.seg button{ border:0; background:none; border-radius:4px; padding:2px 8px; cursor:pointer; color:var(--muted); font-size:12.5px; font-weight:500; }
+.seg button[aria-pressed="true"]{ background:var(--dykem); color:var(--surface); }
+.passrow .rule{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* tabs */
 .tabs{ display:flex; border:1px solid var(--line); border-radius:7px; padding:2px; background:var(--surface); }
@@ -101,7 +106,8 @@ table{ width:100%; border-collapse:collapse; }
 .verdict b{ color:var(--ink); font-weight:600; }
 .grid.four{ grid-template-columns:repeat(4,minmax(0,1fr)); }
 .fld input::placeholder{ color:var(--muted); font-weight:500; opacity:1; }
-.foot .ver{ font-size:11.5px; color:var(--muted); }
+.foot .ver{ font-size:11.5px; color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.foot .ver.on{ font-size:12.5px; color:var(--good); }
 canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5px; background:var(--bg); border:1px solid var(--line); }
 .leg{ display:flex; gap:12px; font-size:11px; color:var(--muted); margin-top:3px; }
 .leg i{ display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:3px; margin-right:4px; }
@@ -114,7 +120,9 @@ canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5p
 .bt td{ border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
 .bt td.l, .bt th.l{ text-align:left; }
 .bt{ table-layout:fixed; }
-.bt th:nth-child(1){ width:30px; } .bt th:nth-child(3), .bt th:nth-child(4){ width:46px; } .bt th:nth-child(5){ width:44px; } .bt th:nth-child(6){ width:72px; }
+.bt th:nth-child(1){ width:28px; } .bt th:nth-child(3){ width:66px; } .bt th:nth-child(4), .bt th:nth-child(5){ width:42px; } .bt th:nth-child(6){ width:42px; } .bt th:nth-child(7){ width:58px; }
+.bt select{ width:100%; font-size:12px; border:1px solid var(--line); border-radius:4px; background:var(--bg); padding:0 1px; }
+.bt select.fin{ color:var(--dykem); font-weight:600; }
 .bt td.name{ overflow:hidden; text-overflow:ellipsis; }
 .bt td.why{ white-space:normal; line-height:1.3; }
 .bt td:last-child{ overflow:hidden; text-overflow:ellipsis; }
@@ -145,6 +153,13 @@ canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5p
       <span class="nav hidden" id="nav"><button type="button" id="prev" aria-label="Previous operation">‹</button><span id="navpos"></span><button type="button" id="next" aria-label="Next operation">›</button></span>
     </div>
     <div class="meta" id="opmeta">Click an operation in the CAM browser. Select several, or a whole setup, to optimize them together.</div>
+    <div class="passrow hidden" id="passrow">
+      <span>Pass</span>
+      <span class="seg" role="group" aria-label="Pass type">
+        <button type="button" data-pass="rough" aria-pressed="false">Rough</button><button type="button" data-pass="wall" aria-pressed="false">Wall finish</button><button type="button" data-pass="floor" aria-pressed="false">Floor finish</button>
+      </span>
+      <span class="rule" id="passrule"></span>
+    </div>
   </section>
 
   <div class="tabs" role="tablist">
@@ -175,6 +190,8 @@ canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5p
         <div class="fld"><label for="pmax">Spindle power</label><div class="box"><input id="pmax" class="num" inputmode="decimal"><span>kW</span></div></div>
         <div class="fld"><label for="eta">Efficiency</label><div class="box"><input id="eta" class="num" inputmode="decimal"></div></div>
         <label class="chk" style="align-self:end"><input type="checkbox" id="usePow">Limit power</label>
+        <div class="fld"><label for="deflFinish" title="Deflection limit for wall and floor finishing passes">Finish deflection</label><div class="box"><input id="deflFinish" class="num" inputmode="decimal"><span>mm</span></div></div>
+        <div class="fld"><label for="clearance" title="Stock a wall finish leaves on the floor, and a floor finish leaves on the walls">Finish clearance</label><div class="box"><input id="clearance" class="num" inputmode="decimal"><span>mm</span></div></div>
       </div>
       <div class="row" style="margin-top:8px">
         <span class="lbl">Profile</span><select id="lsel" aria-label="Limit profile"></select>
@@ -214,11 +231,11 @@ canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5p
   <!-- all selected -->
   <section class="card bulk hidden" id="allView" aria-label="All selected operations">
     <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-      <span style="font-size:12.5px;color:var(--muted)">Bulk keeps each operation’s stepover and stepdown unless you untick the boxes above.</span>
+      <span style="font-size:12.5px;color:var(--muted)">Bulk keeps each operation’s stepover and stepdown unless you untick the boxes above. Finish passes always keep them.</span>
     </div>
     <div class="scroll">
       <table class="bt">
-        <thead><tr><th class="l">T</th><th class="l">Operation</th><th>Now</th><th>Best</th><th>Gain</th><th class="l">Limited by</th></tr></thead>
+        <thead><tr><th class="l">T</th><th class="l">Operation</th><th class="l">Pass</th><th>Now</th><th>Best</th><th>Gain</th><th class="l">Limited by</th></tr></thead>
         <tbody id="btbody"></tbody>
       </table>
     </div>
@@ -226,9 +243,9 @@ canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5p
   </section>
 
   <div class="foot">
-    <span class="ver" id="ver"></span>
-    <span class="sp"></span>
-    <button type="button" class="btn" id="apply" disabled title="Writing back to the operation comes in the next version">Apply (coming soon)</button>
+    <span class="ver" id="ver" role="status"></span>
+    <button type="button" class="btn hidden" id="revert" title="Put back every value the last Apply changed">Revert</button>
+    <button type="button" class="btn primary" id="apply" disabled>Apply</button>
   </div>
 </div>
 
@@ -263,8 +280,11 @@ const MATERIALS = {
 };
 const E_CARBIDE = 600000;   // N/mm², solid carbide (same as the calculator)
 const DEFAULT_MAT = "Aluminium (wrought)";
-const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","eta"];
-const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", hmMin:"", nmax:24000, vfmax:"", deflMax:"", vcMin:"", vcMax:"", helixDefault:35, pmax:2.2, eta:0.85 };
+const VERSION = "0.4.0";
+const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","eta","deflFinish","clearance"];
+const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", hmMin:"", nmax:24000, vfmax:"", deflMax:"", vcMin:"", vcMax:"", helixDefault:35, pmax:2.2, eta:0.85,
+  deflFinish:0.01, clearance:0.05 };
+const DEFAULT_CLEARANCE = 0.05;
 const WORKING = "__working";          // auto-saved working limits; hidden from the profile list
 const STEP = 0.1;
 const $ = id => document.getElementById(id);
@@ -279,6 +299,8 @@ function g(v, s=3){ if(!isFinite(v)) return "–"; if(v === 0) return "0"; const
 function num(id){ const v = parseFloat($(id).value); return isFinite(v) ? v : undefined; }
 function esc(s){ return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])); }
 function setMsg(t){ $("msg").textContent = t || ""; }
+/* One-line result in the footer (Apply/Revert), so a success doesn't push the panel into scrolling. */
+function setStatus(t){ const v = $("ver"); v.textContent = t || `djr_cutoptimizer v${VERSION}`; v.title = t || ""; v.classList.toggle("on", !!t); }
 
 /* ---------- bridge ---------- */
 let FUSION = false;
@@ -332,13 +354,21 @@ function stickoutFor(p){
 
 /* The limits the optimizer sees for one op: chip limits filled from the material table,
    and a deflection limit turned into the force it allows at this stickout. */
+/* The deflection limit for one op: the general one, tightened to Finish deflection on finish passes. */
+function deflLimit(p, L){
+  const v = Math.min(L.deflMax > 0 ? L.deflMax : Infinity, isFinish(p) && L.deflFinish > 0 ? L.deflFinish : Infinity);
+  return isFinite(v) ? v : undefined;
+}
+function clearanceOf(L){ return L.clearance >= 0 ? L.clearance : DEFAULT_CLEARANCE; }
+
 function effLimits(p, L){
   const a = chipAuto(p);
   const o = { nmax:L.nmax, Fmax:L.Fmax, slopeMax:L.slopeMax, vfmax:L.vfmax,
     hexMax: L.hexMax > 0 ? L.hexMax : a.hexMax, hmMin: L.hmMin > 0 ? L.hmMin : a.hmMin, vcMin:L.vcMin, vcMax:L.vcMax };
   if(L.usePow && L.pmax){ o.Pmax = L.pmax; o.eta = L.eta || 1; }
-  if(L.deflMax > 0){
-    const Fd = L.deflMax / deflection(1, p.tool.D, stickoutFor(p).so);
+  const dl = deflLimit(p, L);
+  if(dl > 0){
+    const Fd = dl / deflection(1, p.tool.D, stickoutFor(p).so);
     if(!(o.Fmax > 0) || Fd < o.Fmax){ o.Fmax = Fd; o.deflBinds = true; }
   }
   return o;
@@ -393,9 +423,51 @@ function toolOf(p, L){
   return { D:p.tool.D, z:p.tool.z || 2, helix:helixFor(p, L).helix, kc1, mc, rake:0, kappa:90, fluteLen:p.tool.fluteLen };
 }
 function geomOverride(p){ return overrides["geom:" + opKey(p)] || {}; }
+
+/* ---------- pass type: rough, wall finish, floor finish ----------
+   A finish pass keeps its engagement fixed (only rpm and feed are optimized) and, on Apply,
+   sets stock to leave: a wall finish leaves the clearance on the floor, a floor finish
+   leaves it on the walls. */
+const PASS_LABEL = { rough:"Rough", wall:"Wall finish", floor:"Floor finish" };
+function defaultPass(p){
+  const n = (p.operation || "").toLowerCase();
+  if(/rough/.test(n)) return "rough";
+  if(/floor|bottom/.test(n)) return "floor";
+  if(/wall/.test(n)) return "wall";
+  if(/finish|\bfin\b/.test(n)) return p.kind === "pocket" || p.kind === "face" ? "floor" : "wall";
+  return p.kind === "contour" ? "wall" : "rough";
+}
+function passFor(p){ const o = overrides["pass:" + opKey(p)]; return PASS_LABEL[o] ? o : defaultPass(p); }
+function isFinish(p){ return passFor(p) !== "rough"; }
+function setPass(p, v){
+  if(v === defaultPass(p)) delete overrides["pass:" + opKey(p)]; else overrides["pass:" + opKey(p)] = v;
+  saveWorking(); results = {};                // a rough op's stock feeds the finish ops' engagement
+  applyKeepDefaults(); renderCard(); schedule();
+}
+/* The stock the selected roughing ops in the same setup leave: a wall finish's stepover,
+   a floor finish's stepdown. */
+function roughStock(p){
+  const s = { radial:0, axial:0 };
+  readable().forEach(q => {
+    if(q.setup !== p.setup || isFinish(q) || !q.stock) return;
+    if(q.stock.radial > s.radial) s.radial = q.stock.radial;
+    if(q.stock.axial > s.axial) s.axial = q.stock.axial;
+  });
+  return s;
+}
 function currentGeom(p){
-  const o = geomOverride(p);
-  return { ae: isFinite(o.ae) ? o.ae : p.op.ae, ap: isFinite(o.ap) ? o.ap : p.op.ap };
+  const o = geomOverride(p), ps = passFor(p);
+  let ae = p.op.ae, ap = p.op.ap, from = "";
+  if(ps === "wall"){ const s = roughStock(p).radial; if(s > 0){ ae = s; from = "ae"; } }
+  if(ps === "floor"){ const s = roughStock(p).axial; if(s > 0){ ap = s; from = "ap"; } }
+  if(isFinite(o.ae)) { ae = o.ae; if(from === "ae") from = ""; }
+  if(isFinite(o.ap)) { ap = o.ap; if(from === "ap") from = ""; }
+  return { ae, ap, from };
+}
+/* What stays fixed for one op: finish passes keep both, slots keep the full width. */
+function keeps(p){
+  const fin = isFinish(p);
+  return { ae: fin || p.kind === "slot" || $("keepAe").checked, ap: fin || $("keepAp").checked };
 }
 
 function currentCut(p, L){
@@ -410,11 +482,10 @@ function currentCut(p, L){
 
 function optimizeOp(p, L, bulk){
   const t = toolOf(p, L), { ae, ap } = currentGeom(p);
-  const keepAe = $("keepAe").checked || p.kind === "slot";
-  const keepAp = $("keepAp").checked;
+  const k = keeps(p), fin = isFinish(p);
   const opts = { apMax: t.fluteLen || undefined };
-  if(keepAe){ if(!(ae > 0)) return { ok:false, reason:"Stepover unknown. Enter it under Current, or untick Keep stepover." }; opts.aeLock = Math.min(ae, t.D); }
-  if(keepAp){ if(!(ap > 0)) return { ok:false, reason:"Stepdown unknown. Enter it under Current, or untick Keep stepdown." }; opts.apLock = ap; }
+  if(k.ae){ if(!(ae > 0)) return { ok:false, reason: fin ? "Finish stepover unknown. Enter it under Current (the stock left on the wall)." : "Stepover unknown. Enter it under Current, or untick Keep stepover." }; opts.aeLock = Math.min(ae, t.D); }
+  if(k.ap){ if(!(ap > 0)) return { ok:false, reason: fin ? "Finish stepdown unknown. Enter it under Current." : "Stepdown unknown. Enter it under Current, or untick Keep stepdown." }; opts.apLock = ap; }
   if(bulk){ opts.nAe = 20; opts.nAp = 20; }
   const Lo = effLimits(p, L);
   try{
@@ -435,8 +506,9 @@ const KEEP_DEFAULT = { adaptive:{ ae:false, ap:true }, face:{ ae:false, ap:true 
 function applyKeepDefaults(){
   if(mode !== "one") return;
   const p = ops[idx], d = (p && p.ok && KEEP_DEFAULT[p.kind]) || { ae:false, ap:false };
-  $("keepAe").checked = d.ae; $("keepAp").checked = d.ap;
-  $("keepAe").disabled = !!(p && p.kind === "slot");
+  const fin = !!(p && p.ok && isFinish(p));
+  $("keepAe").checked = fin || d.ae; $("keepAp").checked = fin || d.ap;
+  $("keepAe").disabled = fin || !!(p && p.kind === "slot"); $("keepAp").disabled = fin;
 }
 
 /* Short limit names for the bulk table's narrow column. */
@@ -450,13 +522,16 @@ function shortReason(r){
 }
 
 /* ---------- load from Fusion ---------- */
-function loadOps(r){
+function loadOps(r, keepPlace){
   if(!r || !r.ok){
     if(!ops.length){ setMsg(r && r.reason || "Couldn’t read the selection."); renderCard(); }
     else setMsg(r && r.reason || "");
     return;
   }
-  ops = r.ops || []; idx = Math.max(0, ops.findIndex(p => p.ok)); results = {}; materialChoice = null;
+  const prevKey = keepPlace && ops[idx] ? opKey(ops[idx]) : null;
+  ops = r.ops || []; results = {}; materialChoice = null;
+  const j = prevKey ? ops.findIndex(p => opKey(p) === prevKey) : -1;
+  idx = j >= 0 ? j : Math.max(0, ops.findIndex(p => p.ok));
   setMsg(r.note || "");
   const many = ops.length > 1;
   $("tabAll").disabled = !many;
@@ -486,6 +561,16 @@ function renderCard(){
   const many = ops.length > 1;
   $("nav").classList.toggle("hidden", !many || mode !== "one");
   $("navpos").textContent = many ? `${idx+1}/${ops.length}` : "";
+  const showPass = !!(p && p.ok && mode === "one");
+  $("passrow").classList.toggle("hidden", !showPass);
+  if(showPass){
+    const ps = passFor(p), c = String(+clearanceOf(readLimits()).toFixed(3));
+    document.querySelectorAll("#passrow [data-pass]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pass === ps)));
+    $("passrule").textContent = ps === "wall" ? `floor stock ${c} mm` : ps === "floor" ? `wall stock ${c} mm` : "stock unchanged";
+    $("passrule").title = ps === "wall" ? `Apply sets stock to leave: ${c} mm axial (floor), 0 radial (wall). Stepover and stepdown stay fixed; only rpm and feed are optimized.`
+      : ps === "floor" ? `Apply sets stock to leave: ${c} mm radial (wall), 0 axial (floor). Stepover and stepdown stay fixed; only rpm and feed are optimized.`
+      : "Apply leaves this operation’s stock to leave as it is.";
+  }
   if(!p){
     card.classList.add("empty"); $("tno").classList.add("hidden");
     $("opname").textContent = "No operation selected";
@@ -555,13 +640,18 @@ function renderOne(){
     const b = opt.best;
     setCell("o_n", f(b.n,0)); setCell("o_vf", f(b.vf,0)); setCell("o_ae", b.ae, 3); setCell("o_ap", b.ap, 3);
     setCell("o_fz", b.fz, 3); setCell("o_q", b.Q, 3); setCell("o_f", b.peak, 3); setCell("o_s", b.robustSlope, 3); setCell("o_d", b.defl, 2);
-    const Lo = effLimits(p, L);
+    const Lo = effLimits(p, L), dl = deflLimit(p, L);
     if(L.Fmax) $("b_f").style.width = Math.min(100, b.peak / L.Fmax * 100) + "%";
-    if(L.deflMax) $("b_d").style.width = Math.min(100, b.defl / L.deflMax * 100) + "%";
+    if(dl) $("b_d").style.width = Math.min(100, b.defl / dl * 100) + "%";
     if(L.slopeMax) $("b_s").style.width = Math.min(100, b.robustSlope / L.slopeMax * 100) + "%";
     if(cur && cur.Q > 0){ const r = b.Q / cur.Q; $("gain").textContent = `×${f(r, 2)}`; $("gain").classList.toggle("down", r < 0.995);
       $("gain").title = r < 0.995 ? "Slower than now: the current cut is over your limits" : "Removal rate compared with now"; }
     let v = `Limited by <b>${esc(b.bindLabel)}</b>.`;
+    if(isFinish(p)){
+      v = `<b>${PASS_LABEL[passFor(p)]}:</b> engagement fixed${dl ? `, deflection ≤ ${g(dl,2)} mm` : ""}. ` + v;
+      if(geo.from === "ae") v += ` Stepover is the ${g(geo.ae,3)} mm the roughing leaves on the wall.`;
+      if(geo.from === "ap") v += ` Stepdown is the ${g(geo.ap,3)} mm the roughing leaves on the floor.`;
+    }
     if(opt.snapped) v += " Depth sits just under a whole flute pitch, where force is smoothest.";
     if(cur){
       const over = CutOpt.checkLimits(cur, Lo, cur.n).map(x => limitName(x.limit, Lo));
@@ -569,7 +659,7 @@ function renderOne(){
     } else v += " Couldn’t read the current cut fully, so there’s nothing to compare.";
     if(!(L.vfmax > 0) && b.ae <= 0.021 * p.tool.D) v += ` Stepover is at its 2% floor with a ${f(b.vf,0)} mm/min feed: set <b>Max feed</b> (More limits) to what your machine can really do.`;
     if(helixFor(p, L).assumed && L.slopeMax) v += " Helix is assumed; check it for the slope limit.";
-    if(stickoutFor(p).assumed && L.deflMax) v += " Stickout is assumed; check it for the deflection limit.";
+    if(stickoutFor(p).assumed && dl) v += " Stickout is assumed; check it for the deflection limit.";
     $("verdict").innerHTML = v;
   } else if(opt){
     $("verdict").innerHTML = `<b>No result:</b> ${esc(opt.reason)}`;
@@ -585,24 +675,91 @@ function renderAll(){
     const R = results[opKey(p)];
     const tcell = `<td class="l tn">${p.toolNumber != null ? "T" + esc(p.toolNumber) : ""}</td>`;
     const ncell = `<td class="l name" title="${esc(p.operation)} — ${esc(p.setup)}">${esc(p.operation)}</td>`;
-    if(!p.ok){ tr.className = "skip"; tr.innerHTML = tcell + ncell + `<td colspan="4" class="l why">${esc(p.reason)}</td>`; tb.appendChild(tr); return; }
-    if(!R){ pending++; tr.className = "skip"; tr.innerHTML = tcell + ncell + `<td colspan="4" class="l">…</td>`; tb.appendChild(tr); return; }
+    if(!p.ok){ tr.className = "skip"; tr.innerHTML = tcell + ncell + `<td colspan="5" class="l why">${esc(p.reason)}</td>`; tb.appendChild(tr); return; }
+    const ps = passFor(p);
+    const pcell = `<td class="l"><select data-i="${i}" aria-label="Pass for ${esc(p.operation)}" class="${ps !== "rough" ? "fin" : ""}">` +
+      Object.keys(PASS_LABEL).map(k => `<option value="${k}"${k === ps ? " selected" : ""}>${k === "rough" ? "Rough" : k === "wall" ? "Walls" : "Floors"}</option>`).join("") + `</select></td>`;
+    if(!R){ pending++; tr.className = "skip"; tr.innerHTML = tcell + ncell + pcell + `<td colspan="4" class="l">…</td>`; tb.appendChild(tr); return; }
     const opt = R.opt, cur = R.cur;
-    if(!opt.ok){ tr.className = "skip"; tr.innerHTML = tcell + ncell + `<td colspan="4" class="l why">${esc(shortReason(opt.reason))}</td>`; tb.appendChild(tr); return; }
+    if(!opt.ok){ tr.className = "skip"; tr.innerHTML = tcell + ncell + pcell + `<td colspan="4" class="l why">${esc(shortReason(opt.reason))}</td>`; tb.appendChild(tr); return; }
     const gain = cur && cur.Q > 0 ? opt.best.Q / cur.Q : NaN;
     if(isFinite(gain)){ gainSum += gain; gainN++; }
     n++;
     tr.className = "okrow"; tr.title = "Open this operation";
-    tr.innerHTML = tcell + ncell + `<td class="q">${cur ? g(cur.Q,3) : "–"}</td><td class="q" style="color:var(--dykem)">${g(opt.best.Q,3)}</td>` +
+    tr.innerHTML = tcell + ncell + pcell + `<td class="q">${cur ?g(cur.Q,3) : "–"}</td><td class="q" style="color:var(--dykem)">${g(opt.best.Q,3)}</td>` +
       `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td><td class="l" style="color:var(--muted)" title="${esc(opt.best.bindLabel)}">${esc(SHORT_LIMIT[opt.best.bindLabel] || opt.best.bindLabel)}</td>`;
-    tr.addEventListener("click", () => { idx = i; setMode("one"); });
+    tr.addEventListener("click", e => { if(e.target.closest("select")) return; idx = i; setMode("one"); });
     tb.appendChild(tr);
+  });
+  tb.querySelectorAll("select[data-i]").forEach(s => {
+    s.addEventListener("click", e => e.stopPropagation());
+    s.addEventListener("change", () => setPass(ops[+s.dataset.i], s.value));
   });
   $("bsum").innerHTML = pending ? `<span>Optimizing… ${ops.length - pending}/${ops.length}</span>` :
     `<span><b>${n}</b> of ${ops.length} optimized · removal rate in cm³/min</span><span>${gainN ? `average <b class="gain">×${f(gainSum/gainN,2)}</b>` : ""}</span>`;
 }
 
-function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne(); else renderAll(); }
+function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne(); else renderAll(); renderApply(); }
+
+/* ---------- apply ----------
+   Writes rpm and feed (and, for rough passes, a stepover/stepdown that was optimized or typed
+   in) to each op, plus stock to leave for finish passes, then regenerates. Two clicks: the
+   first arms the button for 4 s. Python checks every write and puts an op back on failure. */
+let applyArm = 0, busy = false;
+function applyTargets(){
+  const todo = mode === "one" ? (ops[idx] ? [ops[idx]] : []) : readable();
+  return todo.filter(p => { const R = p.ok && results[opKey(p)]; return R && R.opt && R.opt.ok; });
+}
+function applyItem(p){
+  const b = results[opKey(p)].opt.best, ps = passFor(p), it = { id:opKey(p), n:b.n, vf:b.vf, pass:ps };
+  if(ps === "rough"){
+    const k = keeps(p), o = geomOverride(p);
+    if(p.kind !== "slot"){ if(!k.ae) it.ae = b.ae; else if(isFinite(o.ae)) it.ae = o.ae; }
+    if(!k.ap) it.ap = b.ap; else if(isFinite(o.ap)) it.ap = o.ap;
+  }
+  return it;
+}
+function renderApply(){
+  const btn = $("apply"), t = applyTargets(), n = t.length;
+  btn.disabled = !FUSION || busy || !n;
+  btn.textContent = busy ? "Applying…" : applyArm ? `Confirm: write ${n} op${n === 1 ? "" : "s"}` : n > 1 ? `Apply to ${n} ops` : "Apply";
+  btn.title = !FUSION ? "Open this panel in Fusion to apply" : !n ? "Nothing optimized to apply yet"
+    : "Write spindle speed and feed (and stock to leave for finish passes), then regenerate the toolpaths";
+}
+function onApply(){
+  const t = applyTargets();
+  if(!t.length || busy) return;
+  if(!applyArm){ applyArm = setTimeout(() => { applyArm = 0; renderApply(); }, 4000); renderApply(); return; }
+  clearTimeout(applyArm); applyArm = 0;
+  const items = t.map(applyItem), L = readLimits();
+  busy = true; renderApply(); setMsg(""); setStatus("");
+  send("apply", { items, clearance: clearanceOf(L) }).then(r => {
+    busy = false;
+    if(!r){ renderApply(); setMsg("No answer from Fusion."); return; }
+    const name = id => { const p = ops.find(o => opKey(o) === id); return p ? p.operation : id; };
+    const fails = (r.results || []).filter(x => !x.ok);
+    const ok = r.applied ? `✓ Applied to ${r.applied} op${r.applied === 1 ? "" : "s"}${r.generating ? ", regenerating" : ""}` : "";
+    const bad = fails.length ? `${fails.length === 1 ? "1 operation wasn’t" : fails.length + " operations weren’t"} changed. ` +
+      fails.map(x => `${name(x.id)}: ${x.reason}`).join(" ") : (r.applied ? "" : (r.reason || "Nothing was changed."));
+    $("revert").classList.toggle("hidden", !r.canRevert);
+    reread(ok, bad);
+  }, () => { busy = false; renderApply(); setMsg("Couldn’t reach Fusion."); });
+}
+function onRevert(){
+  if(busy) return;
+  busy = true; renderApply(); setStatus("");
+  send("revert", {}).then(r => {
+    busy = false; $("revert").classList.add("hidden");
+    if(r && r.ok) reread(`↶ Reverted ${r.reverted} op${r.reverted === 1 ? "" : "s"}, regenerating`, "");
+    else reread("", r && r.reason || "Couldn’t revert.");
+  }, () => { busy = false; renderApply(); setMsg("Couldn’t reach Fusion."); });
+}
+/* Read the ops again so Current shows what Fusion now holds. Success goes in the footer,
+   problems in the message box. */
+function reread(status, problems){
+  const done = () => { setStatus(status); setMsg(problems); renderApply(); };
+  send("readOps", {}).then(r => { loadOps(r, true); done(); }, done);
+}
 
 /* ---------- force curve ----------
    Same style as the calculator: tangential force over one revolution (0–360°), 0 N at the
@@ -651,7 +808,7 @@ function setMode(m){
   $("tabAll").setAttribute("aria-selected", String(m === "all"));
   $("oneView").classList.toggle("hidden", m !== "one");
   $("allView").classList.toggle("hidden", m !== "all");
-  if(m === "all"){ $("keepAe").checked = true; $("keepAp").checked = true; $("keepAe").disabled = false; }
+  if(m === "all"){ $("keepAe").checked = true; $("keepAp").checked = true; $("keepAe").disabled = false; $("keepAp").disabled = false; }
   else applyKeepDefaults();
   results = {}; renderCard(); schedule();
 }
@@ -661,10 +818,15 @@ function init(){
   const ms = $("mat");
   Object.keys(MATERIALS).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = k; ms.appendChild(o); });
   ms.value = DEFAULT_MAT;
-  $("ver").textContent = "djr_cutoptimizer";
+  setStatus("");
   writeLimits(DEFAULT_LIMITS);
+  document.querySelectorAll("#passrow [data-pass]").forEach(b => b.addEventListener("click", () => {
+    const p = ops[idx]; if(p && p.ok) setPass(p, b.dataset.pass);
+  }));
+  $("apply").addEventListener("click", onApply);
+  $("revert").addEventListener("click", onRevert);
 
-  LIMIT_FIELDS.forEach(k => $(k).addEventListener("change", () => { $("lsel").value = ""; saveWorking(); invalidate(); }));
+  LIMIT_FIELDS.forEach(k => $(k).addEventListener("change", () => { $("lsel").value = ""; saveWorking(); renderCard(); invalidate(); }));
   $("usePow").addEventListener("change", () => { saveWorking(); invalidate(); });
   ["keepAe","keepAp"].forEach(k => $(k).addEventListener("change", invalidate));
   ["c_ae","c_ap"].forEach(k => $(k).addEventListener("change", e => {

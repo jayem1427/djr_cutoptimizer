@@ -1,6 +1,7 @@
 """
-Pure mapping from Fusion CAM parameters to the calculator's inputs (mm, rpm, mm/min).
-No adsk import, so it runs under pytest.
+Pure mapping from Fusion CAM parameters to the calculator's inputs (mm, rpm, mm/min),
+and the reverse: which parameters Apply writes (plan_writes) and how to check them
+(write_matches). No adsk import, so it runs under pytest.
 
 **The parameter names below are unverified.** They come from the handoff and common
 Fusion naming. Run fusion/scripts/djr_dump_cam_params on an adaptive, a 2D contour and
@@ -29,6 +30,15 @@ TOOL_NAMES = {
     'helix':    ['tool_helixAngle'],
     'type':     ['tool_type'],
 }
+# Stock to leave, written for finishing passes. Also unverified: Apply reads every value
+# back after writing it and puts the operation back if anything doesn't match.
+STOCK_NAMES = {
+    'radial': ['radialStockToLeave'],
+    'axial':  ['axialStockToLeave'],
+}
+# The "Stock to leave" checkbox that enables the two values (a boolean parameter).
+STOCK_FLAG = ['stockToLeave', 'doStockToLeave', 'useStockToLeave']
+PASSES = ('rough', 'wall', 'floor')
 # Text fields shown on the operation card (not used in the math).
 TOOL_TEXT = {
     'number':      ['tool_number'],
@@ -176,9 +186,97 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
         op['fz'] = op['vf'] / (op['n'] * tool['z'])
 
     missing = [k for k in ('D', 'z') if tool.get(k) is None] + [k for k in ('n', 'vf', 'ae', 'ap') if op.get(k) is None]
+    # Which parameter each value came from, so Apply writes back to exactly that one.
+    src = {k: found_name(op_params, OP_NAMES[k], KIND[k]) for k in ('n', 'vf', 'ae', 'ap')}
+    if kind_or_reason == 'slot':
+        src['ae'] = None                 # a slot's width is the tool; nothing to write
+    stock = {k: read_value(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
+    stock_src = {k: found_name(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
+    stock_src['flag'] = next((n for n in STOCK_FLAG if n in op_params and isinstance(op_params[n][1], bool)), None)
     return {'ok': True, 'operation': op_name, 'strategy': strategy, 'strategyLabel': label, 'kind': kind_or_reason,
             'toolNumber': card['number'], 'toolDesc': card['description'],
-            'tool': tool, 'op': op, 'material': material, 'missing': missing}
+            'tool': tool, 'op': op, 'material': material, 'missing': missing,
+            'src': src, 'stock': stock, 'stockSrc': stock_src}
+
+
+def found_name(params: dict, names: list, kind: str) -> Optional[str]:
+    """The first candidate parameter that exists and holds a readable value."""
+    for name in names:
+        if name in params and read_value(params, [name], kind) is not None:
+            return name
+    return None
+
+
+def _num(v) -> Optional[float]:
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return v if math.isfinite(v) else None
+
+
+def _fmt(v: float) -> str:
+    return f'{round(v, 4):g}'
+
+
+def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dict] = None) -> list:
+    """The parameter writes for one operation: [(name, expression, kind, target)].
+
+    item: {n, vf, pass, ae?, ap?} from the panel (rpm, mm/min, mm). ae/ap are written only
+    when given. Finishing passes also set stock to leave: a wall finish leaves `clearance`
+    on the floor (axial) and none on the wall; a floor finish the other way round.
+    Raises ValueError when something needed is missing, so the op is skipped as a whole:
+    half-applied feeds and speeds are worse than none.
+    """
+    n, vf = _num(item.get('n')), _num(item.get('vf'))
+    if not (n and n > 0 and vf and vf > 0):
+        raise ValueError('No valid spindle speed and feed to write.')
+    if not src.get('n') or not src.get('vf'):
+        raise ValueError('Couldn’t find this operation’s spindle speed or cutting feed parameter.')
+    rpm, feed = math.floor(n), math.floor(vf)          # round down: never above a limit
+    writes = [(src['n'], f'{rpm} rpm', 'rpm', float(rpm)),
+              (src['vf'], f'{feed} mm/min', 'feed', float(feed))]
+    for k, label in (('ae', 'stepover'), ('ap', 'stepdown')):
+        if item.get(k) is None:
+            continue
+        v = _num(item[k])
+        if not (v and v > 0):
+            raise ValueError(f'Invalid {label}.')
+        if not src.get(k):
+            raise ValueError(f'Couldn’t find this operation’s {label} parameter, so the optimized '
+                             f'{label} can’t be written. Tick Keep {label} and apply again.')
+        writes.append((src[k], f'{_fmt(v)} mm', 'len', round(v, 4)))
+
+    p = item.get('pass') or 'rough'
+    if p not in PASSES:
+        raise ValueError(f'Unknown pass “{p}”.')
+    if p != 'rough':
+        c = _num(clearance)
+        if c is None or not 0 <= c <= 2:
+            raise ValueError('Finish clearance must be between 0 and 2 mm.')
+        stock_src = stock_src or {}
+        if not stock_src.get('radial') or not stock_src.get('axial'):
+            raise ValueError('This operation has no radial/axial stock-to-leave parameters, so the '
+                             'finishing rule can’t be applied. Set it to Rough, or set the stock by hand.')
+        radial, axial = (0.0, c) if p == 'wall' else (c, 0.0)
+        if stock_src.get('flag'):
+            writes.append((stock_src['flag'], 'true', 'bool', True))
+        writes.append((stock_src['radial'], f'{_fmt(radial)} mm', 'len', radial))
+        writes.append((stock_src['axial'], f'{_fmt(axial)} mm', 'len', axial))
+    return writes
+
+
+_TOL = {'rpm': 0.5, 'feed': 0.5, 'len': 1e-4}
+
+
+def write_matches(kind: str, target, expression, internal) -> bool:
+    """Whether a parameter read back after writing holds the intended value."""
+    if kind == 'bool':
+        return internal is True or str(expression).strip().lower() == 'true'
+    got = read_value({'x': (expression, internal)}, ['x'], kind)
+    if got is None:
+        return False
+    return abs(got - target) <= max(_TOL.get(kind, 1e-6), 1e-3 * abs(target))
 
 
 def params_to_dict(params) -> dict:

@@ -5,7 +5,7 @@ Run from Fusion (Utilities > Add-Ins > Scripts and Add-Ins > Scripts > +, point 
 this folder, then Run) with a document open in Manufacture.
 
 Select the operations to dump in the CAM browser first (an adaptive, a 2D contour
-and a slot are what the optimizer needs). With nothing selected, every operation
+with stock to leave ticked, a 2D pocket and a slot are what the optimizer needs). With nothing selected, every operation
 in the document is dumped.
 
 Writes one text file per operation, plus summary.json, into a folder you pick.

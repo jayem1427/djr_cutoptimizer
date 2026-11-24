@@ -39,8 +39,11 @@ tests/               test_addin.py (stdlib unittest with a fake adsk), web_optim
 
 - JS → Python: `adsk.fusionSendData(action, json)` → `palette.incomingFromHTML`; the handler sets `args.returnData`, which the JS receives as a Promise result.
 - Python → JS: `palette.sendInfoToHTML(action, json)` → `window.fusionJavaScriptHandler.handle(action, data)`.
-- Actions from the page: `ready`/`readOps` (every selected op; setups, folders and patterns expand), `getLimits`, `saveLimits`, `setMaterial` (`{material, setups}`). To the page: `selectionChanged` (pushed from `ui.activeSelectionChanged` while the palette is visible; an empty selection is ignored), `fusionStatus`.
-- Limit profiles: names starting `__` are internal. `__working` holds the panel's working limits and per-tool overrides (helix by tool key, `so:` stickout, `geom:` current stepover/stepdown).
+- Actions from the page: `ready`/`readOps` (every selected op; setups, folders and patterns expand), `getLimits`, `saveLimits`, `setMaterial` (`{material, setups}`), `apply` (`{items:[{id, n, vf, pass, ae?, ap?}], clearance}`), `revert`. To the page: `selectionChanged` (pushed from `ui.activeSelectionChanged` while the palette is visible; an empty selection is ignored), `fusionStatus`.
+- Each op payload carries `src` (the parameter each of n/vf/ae/ap was read from; `ae` is null for slots), `stock` ({radial, axial} mm) and `stockSrc` ({radial, axial, flag}). Apply writes back to exactly those names.
+- **Apply** (`OptimizerCommand.apply`): re-reads each op, calls the pure `cam_mapping.plan_writes`, writes each parameter by expression (a boolean flag by `value.value`), and reads it back with `write_matches`. Any failure restores that op from its snapshot. Changed ops regenerate in one `cam.generateToolpath(ObjectCollection)`. The snapshots of the last apply are kept in memory for `revert`; they're lost when the add-in stops.
+- **Passes:** `rough` / `wall` / `floor`. Finish passes lock ae and ap, use `min(deflMax, deflFinish)`, and write stock to leave: wall = 0 radial / clearance axial; floor = clearance radial / 0 axial. The panel stores the pass in overrides as `pass:<op id>` (only when it differs from `defaultPass`). A finish op's engagement defaults to the max stock the selected rough ops in the same setup leave.
+- Limit profiles: names starting `__` are internal. `__working` holds the panel's working limits and per-tool overrides (helix by tool key, `so:` stickout, `geom:` current stepover/stepdown, `pass:` pass type).
 - The full calculator page was removed from the add-in in v0.3.0 at the owner's request; don't bring it back.
 - Python sends metric (mm, rpm, mm/min); the page switches to metric on load.
 - The page detects Fusion lazily (`hasFusion()` at init and again after 800 ms), because `window.adsk` may be injected late.
@@ -64,9 +67,9 @@ None of this replaces a real Fusion run. Be explicit about what was verified in 
 
 ## Next work (from the original handoff)
 
-1. **Verify parameter names.** The owner runs `djr_dump_cam_params` on an adaptive, a 2D contour and a slot; commit the output to `docs/cam_params/`. Then fix `OP_NAMES`, `TOOL_NAMES` and `INTERNAL_TO_CALC` in `cam_mapping.py`. The feed and speed internal units are unverified; expression parsing is used first, so internal units only matter for expressions that reference other parameters.
-2. **v0.3 Apply:** write spindle speed and cutting feed (plus stepover/stepdown when ticked), then `cam.generateToolpath(op)`. Make it one undoable step if the API allows; otherwise snapshot the old expressions and offer Revert. Ramp, plunge and lead feeds are often expressions tied to the cutting feed; don't overwrite user-set expressions without asking. Refuse unsupported strategies (`cam_mapping.REFUSED`).
-3. **Later:** "Save as preset" into the tool library; "Optimize all in setup", possibly with djr_batchpost.
+1. **Verify parameter names.** The owner runs `djr_dump_cam_params` on an adaptive, a 2D contour (stock to leave ticked), a 2D pocket and a slot, and the output goes in `docs/cam_params/`. Then fix `OP_NAMES`, `TOOL_NAMES`, `STOCK_NAMES`, `STOCK_FLAG` and `INTERNAL_TO_CALC` in `cam_mapping.py`. The feed and speed internal units are unverified. Expression parsing is used first, so internal units only matter for expressions that reference other parameters.
+2. **First real Apply (v0.4).** Not yet run in Fusion. Check that expressions like `18000 rpm` and `2400 mm/min` are accepted, that the feed per tooth follows the cutting feed, and that regeneration starts.
+3. **Later:** scale ramp and plunge feeds with the cutting feed; auto-assign tools and geometry (the owner assigns them by hand for now); "Save as preset" into the tool library; djr_batchpost integration.
 
 ## Model notes (don't relearn these)
 
