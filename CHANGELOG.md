@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.1 — 2026-11-24
+
+**Fixed.** After an update, Stop/Run in Fusion loaded the new panel but kept running the old Python code, so Apply answered "unknown action apply" and nothing changed. The add-in now clears its cached modules when it starts and stops, so Stop/Run picks up an update. If you're coming from v0.4.0 or earlier, restart Fusion once.
+
+The panel now explains a mismatch like that instead of showing "unknown action".
+
 ## v0.4.0 — 2026-11-23
 
 **Apply.** Select operations, mark each one Rough, Wall finish or Floor finish, and write the suggested feeds and speeds back to them in one go.

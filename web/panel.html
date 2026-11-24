@@ -280,7 +280,7 @@ const MATERIALS = {
 };
 const E_CARBIDE = 600000;   // N/mm², solid carbide (same as the calculator)
 const DEFAULT_MAT = "Aluminium (wrought)";
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","eta","deflFinish","clearance"];
 const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", hmMin:"", nmax:24000, vfmax:"", deflMax:"", vcMin:"", vcMax:"", helixDefault:35, pmax:2.2, eta:0.85,
   deflFinish:0.01, clearance:0.05 };
@@ -736,6 +736,8 @@ function onApply(){
   send("apply", { items, clearance: clearanceOf(L) }).then(r => {
     busy = false;
     if(!r){ renderApply(); setMsg("No answer from Fusion."); return; }
+    if(/unknown action/.test(r.reason || "")){ renderApply();
+      setMsg("Fusion is still running an older copy of the add-in, so nothing was changed. Close and reopen Fusion, then try again."); return; }
     const name = id => { const p = ops.find(o => opKey(o) === id); return p ? p.operation : id; };
     const fails = (r.results || []).filter(x => !x.ok);
     const ok = r.applied ? `✓ Applied to ${r.applied} op${r.applied === 1 ? "" : "s"}${r.generating ? ", regenerating" : ""}` : "";
