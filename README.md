@@ -4,7 +4,7 @@ A Fusion add-in that picks **feeds, speeds, stepover and stepdown** for your CAM
 
 Click an operation in the Manufacture browser, and a compact panel shows the current cut next to the best one inside your limits. Shift-select several operations (or a whole setup), mark each as rough, wall finish or floor finish, and **Apply** writes the suggested feeds and speeds to all of them.
 
-> **Status: v0.4. Apply is new and not yet tried in Fusion.** The panel loads in Fusion (checked on Windows). Writing back is tested against a fake Fusion API only, and the CAM parameter names aren't verified on real operations. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
+> **Status: v0.4. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
 
 | One operation | All selected |
 |---|---|
@@ -20,7 +20,7 @@ Click an operation in the Manufacture browser, and a compact panel shows the cur
    - **Mac:** `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/`
 3. Restart Fusion, or open **Utilities → Add-Ins → Scripts and Add-Ins** (Shift+S), select **djr_cutoptimizer**, click **Run**, and tick **Run on startup**.
 
-To upgrade, replace the folder, then **Stop** and **Run** the add-in (or restart Fusion). Your limits live outside the folder and carry over.
+To upgrade, replace the folder, then **Stop** and **Run** the add-in (or restart Fusion). Coming from v0.4.0 or earlier, restart Fusion once; older versions keep their code loaded through Stop/Run. Your limits live outside the folder and carry over.
 
 ## Use
 
@@ -134,10 +134,10 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 
 | | |
 |---|---|
-| Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3). |
+| Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3). Reading a real 3D Adaptive roughing operation, and Apply on it in v0.4.1: spindle speed, feed and stepover were written, read back and the toolpath regenerated. That confirms `tool_spindleSpeed`, `tool_feedCutting` and `optimalLoad`. |
 | Verified by tests | The model and optimizer against the Sandvik and HSM reference cuts (15 Node tests). 40 Python tests against a fake Fusion API: reading operations, expanding setups, skipping unsupported operations, storing the material, limit profiles, and no crash with no document, no CAM data or nothing selected. For Apply, they also cover the write plan for each pass type, read-back checks, rollback when Fusion refuses a value or a parameter is locked, partial bulk applies, and Revert. The panel itself (pass defaults, finish engagement, the two-click Apply, the payload sent to Fusion, Revert, bulk) is driven by a fake Fusion bridge in headless Chrome. |
-| Not verified yet | Anything against real operations: reading them, Apply, Revert and regenerating. |
-| Unverified names | The CAM parameter names in `commands/optimizer/cam_mapping.py`: `tool_spindleSpeed`, `tool_feedCutting`, `optimalLoad`, `maximumStepdown`, `radialStockToLeave`, `axialStockToLeave`, `stockToLeave`, `tool_bodyLength`, …. A wrong name makes Apply refuse that operation with a message; it doesn't write somewhere else. |
+| Not verified yet | Wall and floor finish passes (stock to leave), Revert, Apply on a pocket, contour or slot, and bulk Apply on several operations. |
+| Unverified names | The other CAM parameter names in `commands/optimizer/cam_mapping.py`: `maximumStepdown` (read, not yet written), `radialStockToLeave`, `axialStockToLeave`, `stockToLeave`, `tool_bodyLength`, …. A wrong name makes Apply refuse that operation with a message; it doesn't write somewhere else. |
 
 **Help verify the parameter names:** run the `djr_dump_cam_params` script from the release (Scripts tab → **+** → the unzipped folder → **Run**). Select an adaptive, a 2D contour (with stock to leave ticked), a 2D pocket and a slot first. Then commit its output to `docs/cam_params/`.
 

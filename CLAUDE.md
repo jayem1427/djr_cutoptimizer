@@ -46,6 +46,7 @@ tests/               test_addin.py (stdlib unittest with a fake adsk), web_optim
 - Limit profiles: names starting `__` are internal. `__working` holds the panel's working limits and per-tool overrides (helix by tool key, `so:` stickout, `geom:` current stepover/stepdown, `pass:` pass type).
 - The full calculator page was removed from the add-in in v0.3.0 at the owner's request; don't bring it back.
 - Python sends metric (mm, rpm, mm/min); the page switches to metric on load.
+- Fusion keeps one Python process per session. `djr_cutoptimizer.py` drops the add-in's cached modules (matched by file path) on import and on `stop`, so Stop/Run loads updated code. Keep that, or updates need a full Fusion restart.
 - The page detects Fusion lazily (`hasFusion()` at init and again after 800 ms), because `window.adsk` may be injected late.
 
 ## Testing
@@ -68,7 +69,7 @@ None of this replaces a real Fusion run. Be explicit about what was verified in 
 ## Next work (from the original handoff)
 
 1. **Verify parameter names.** The owner runs `djr_dump_cam_params` on an adaptive, a 2D contour (stock to leave ticked), a 2D pocket and a slot, and the output goes in `docs/cam_params/`. Then fix `OP_NAMES`, `TOOL_NAMES`, `STOCK_NAMES`, `STOCK_FLAG` and `INTERNAL_TO_CALC` in `cam_mapping.py`. The feed and speed internal units are unverified. Expression parsing is used first, so internal units only matter for expressions that reference other parameters.
-2. **First real Apply (v0.4).** Not yet run in Fusion. Check that expressions like `18000 rpm` and `2400 mm/min` are accepted, that the feed per tooth follows the cutting feed, and that regeneration starts.
+2. **Finish Apply in Fusion.** Rough Apply works in Fusion (v0.4.1, 3D Adaptive: rpm, feed and `optimalLoad` written and read back, toolpath regenerated). Still untried for real: wall/floor finish stock to leave, Revert, pocket/contour/slot, bulk. Also check that the feed per tooth follows the cutting feed.
 3. **Later:** scale ramp and plunge feeds with the cutting feed; auto-assign tools and geometry (the owner assigns them by hand for now); "Save as preset" into the tool library; djr_batchpost integration.
 
 ## Model notes (don't relearn these)
