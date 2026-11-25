@@ -5,7 +5,7 @@
 	"description":	{
 		"":	"DJR Cut Optimizer: pick feeds, speeds, stepover and stepdown for the selected CAM operation by maximizing removal rate inside your force, force-slope and machine limits. Uses the djr_cutcalculator model (Sandvik-calibrated for aluminium)."
 	},
-	"version":	"0.4.1",
+	"version":	"0.5.0",
 	"runOnStartup":	true,
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true,

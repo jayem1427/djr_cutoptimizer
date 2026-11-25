@@ -4,242 +4,258 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cut optimizer</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
 <style>
+/* Native Fusion look (issue #3). Dark blue is the default; light gray tokens are kept for later. */
 :root{
-  --bg:#E9ECEE; --surface:#F7F8F9; --ink:#16202A; --muted:#5B6672; --line:#CBD1D7;
-  --dykem:#2B3A8F; --dykem-soft:rgba(43,58,143,.10); --good:#2F7D4F; --bronze:#A8622A;
-  --warn-bg:#FBF1DC; --warn-ink:#6B4A0E; --row-hi:rgba(43,58,143,.07);
-  --sans:"Barlow", "Segoe UI", system-ui, sans-serif;
-  --num:"Barlow Condensed", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#1A1F25; --surface:#232930; --ink:#E7EBEE; --muted:#9BA6B0; --line:#363E48;
-    --dykem:#8D9DF2; --dykem-soft:rgba(141,157,242,.16); --good:#6CC48F; --bronze:#C77B3E;
-    --warn-bg:#3A2F1A; --warn-ink:#F0D49A; --row-hi:rgba(141,157,242,.10);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#1A1F25; --surface:#232930; --ink:#E7EBEE; --muted:#9BA6B0; --line:#363E48;
-  --dykem:#8D9DF2; --dykem-soft:rgba(141,157,242,.16); --good:#6CC48F; --bronze:#C77B3E;
-  --warn-bg:#3A2F1A; --warn-ink:#F0D49A; --row-hi:rgba(141,157,242,.10);
+  --bg:#2A2F37; --field:#1E2228; --field-line:#4A525E; --sec-line:#3A414B; --row-line:#343A43;
+  --ink:#E3E6EA; --label:#B5BCC6; --muted:#9AA3AE; --chev:#C9CED6;
+  --primary:#0574B0; --primary-ink:#FFFFFF; --accent:#3D9BE0; --info:#5AB4EC;
+  --warn:#F2A33A; --good:#7CC796; --curve-cur:#8A929C; --hover:rgba(61,155,224,.10);
+  --sans:"Artifakt Element", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: dark;
+}
+:root[data-theme="light"]{
+  --bg:#F3F3F3; --field:#FFFFFF; --field-line:#BDBDBD; --sec-line:#D6D6D6; --row-line:#E2E2E2;
+  --ink:#333333; --label:#595959; --muted:#6B6B6B; --chev:#555555;
+  --primary:#0574B0; --primary-ink:#FFFFFF; --accent:#0574B0; --info:#0574B0;
+  --warn:#A85F00; --good:#2F7D4F; --curve-cur:#9A9A9A; --hover:rgba(5,116,176,.08);
+  color-scheme: light;
 }
 *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
 html,body{ height:100%; }
-body{ background:var(--bg); color:var(--ink); font:14px/1.35 var(--sans); -webkit-font-smoothing:antialiased; }
-.app{ display:flex; flex-direction:column; gap:8px; padding:10px 10px 8px; min-height:100%; max-width:640px; margin:0 auto; }
-.card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:9px 11px; }
-.num{ font-family:var(--num); font-variant-numeric:tabular-nums; }
+body{ background:var(--bg); color:var(--ink); font:12px/1.35 var(--sans); -webkit-font-smoothing:antialiased; }
+.app{ display:flex; flex-direction:column; min-height:100%; max-width:640px; margin:0 auto; }
+.num{ font-variant-numeric:tabular-nums; }
 button, input, select{ font:inherit; color:inherit; }
-button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible{ outline:2px solid var(--dykem); outline-offset:1px; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+input, select{ height:22px; background:var(--field); border:1px solid var(--field-line); border-radius:2px; padding:0 6px; }
+input::placeholder{ color:var(--muted); opacity:1; }
+input:disabled, select:disabled{ opacity:.55; }
 
-/* operation card */
-.op{ border-left:4px solid var(--dykem); }
-.op .top{ display:flex; align-items:baseline; gap:8px; }
-.op .tno{ font:600 13px var(--num); color:var(--surface); background:var(--dykem); border-radius:4px; padding:1px 6px; flex:none; }
-.op .name{ font:600 18px/1.15 var(--num); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.op .nav{ display:flex; align-items:center; gap:2px; color:var(--muted); font-size:12px; flex:none; }
-.op .nav button{ background:none; border:1px solid var(--line); border-radius:4px; width:22px; height:22px; cursor:pointer; line-height:1; }
-.op .meta{ color:var(--muted); font-size:12.5px; margin-top:3px; display:flex; flex-wrap:wrap; gap:2px 10px; align-items:center; }
+/* sections: a collapsible group header, then rows */
+.sec{ border-bottom:1px solid var(--sec-line); }
+.sec > summary{ height:30px; display:flex; align-items:center; gap:6px; padding:0 12px; font-weight:600; cursor:pointer; list-style:none; user-select:none; }
+.sec > summary::-webkit-details-marker{ display:none; }
+.sec > summary::before{ content:""; width:10px; height:10px; flex:none; background:var(--chev);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M3.5 2 L6.5 5 L3.5 8' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M3.5 2 L6.5 5 L3.5 8' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; }
+.sec[open] > summary::before{ transform:rotate(90deg); }
+.sec[open] > summary{ border-bottom:1px solid var(--sec-line); }
+.body{ padding:8px 12px 10px; display:flex; flex-direction:column; gap:4px; }
+.r{ display:grid; grid-template-columns:104px minmax(0,1fr); align-items:center; gap:8px; min-height:26px; }
+.r > .k, .r > label:first-child{ color:var(--label); }
+
+/* operation */
+.op .top{ display:flex; align-items:center; gap:8px; min-height:24px; }
+.op .tno{ color:var(--label); flex:none; }
+.op .name{ font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.op .nav{ display:flex; align-items:center; gap:4px; color:var(--muted); flex:none; }
+.op .nav button{ width:22px; height:22px; background:var(--field); border:1px solid var(--field-line); border-radius:2px; cursor:pointer; line-height:1; }
+.op .meta{ color:var(--label); display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; }
 .op .meta b{ color:var(--ink); font-weight:600; }
-.op .meta input{ width:40px; padding:0 3px; border:1px solid var(--line); border-radius:4px; background:var(--bg); text-align:right; font:600 13px var(--num); }
-.op .meta .assumed{ color:var(--bronze); }
-.op.empty{ border-left-color:var(--line); color:var(--muted); }
-.passrow{ display:flex; align-items:center; gap:7px; margin-top:6px; font-size:12px; color:var(--muted); }
-.seg{ display:inline-flex; flex:none; border:1px solid var(--line); border-radius:6px; padding:1px; background:var(--bg); }
-.seg button{ border:0; background:none; border-radius:4px; padding:2px 8px; cursor:pointer; color:var(--muted); font-size:12.5px; font-weight:500; }
-.seg button[aria-pressed="true"]{ background:var(--dykem); color:var(--surface); }
-.passrow .rule{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.op .meta input{ width:52px; text-align:right; margin:0 3px; }
+.op .meta .assumed, .op .meta .warn{ color:var(--warn); }
+.op.empty .name{ color:var(--muted); font-weight:400; }
+.passrow{ display:grid; grid-template-columns:104px minmax(0,1fr); align-items:center; gap:8px; min-height:26px; color:var(--label); }
+.passrow .ctl{ display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; min-width:0; }
+.seg{ display:inline-flex; flex:none; border:1px solid var(--field-line); border-radius:2px; overflow:hidden; }
+.seg button{ height:20px; border:0; border-left:1px solid var(--field-line); background:var(--field); padding:0 8px; cursor:pointer; color:var(--ink); }
+.seg button:first-child{ border-left:0; }
+.seg button[aria-pressed="true"]{ background:var(--primary); color:var(--primary-ink); }
+.passrow .rule{ min-width:0; color:var(--muted); }
 
-/* tabs */
-.tabs{ display:flex; border:1px solid var(--line); border-radius:7px; padding:2px; background:var(--surface); }
-.tabs button{ flex:1; border:0; background:none; border-radius:5px; padding:4px 0; cursor:pointer; color:var(--muted); font-weight:500; }
-.tabs button[aria-selected="true"]{ background:var(--dykem); color:var(--surface); }
+/* view tabs (This operation / All selected) */
+.tabs{ display:flex; gap:16px; padding:0 12px; border-bottom:1px solid var(--sec-line); }
+.tabs button{ height:30px; border:0; border-bottom:2px solid transparent; background:none; cursor:pointer; color:var(--label); padding:0 2px; }
+.tabs button[aria-selected="true"]{ color:var(--ink); border-bottom-color:var(--accent); font-weight:600; }
 .tabs button:disabled{ opacity:.45; cursor:default; }
 
 /* limits */
-.lim .row{ display:flex; gap:6px; align-items:center; }
-.lim .row + .row, .lim .grid{ margin-top:7px; }
-.lim select{ flex:1; min-width:0; border:1px solid var(--line); border-radius:5px; background:var(--bg); padding:3px 5px; }
-.lim .lbl{ font-size:12px; color:var(--muted); flex:none; }
-.grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 8px; }
-.fld label{ display:block; font-size:11.5px; color:var(--muted); margin-bottom:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.fld .box{ display:flex; align-items:center; gap:4px; }
-.fld input{ width:100%; min-width:0; text-align:right; border:1px solid var(--line); border-radius:5px; background:var(--bg); padding:2px 6px; font:600 15px var(--num); }
-.fld span{ font-size:11.5px; color:var(--muted); flex:none; }
-details{ margin-top:7px; }
-summary{ cursor:pointer; color:var(--muted); font-size:12.5px; list-style:none; }
-summary::before{ content:"▸ "; }
-details[open] summary::before{ content:"▾ "; }
-details .grid{ margin-top:6px; }
-.chk{ display:flex; gap:5px; align-items:center; font-size:12.5px; cursor:pointer; white-space:nowrap; }
-.chk input{ accent-color:var(--dykem); }
-.btn{ border:1px solid var(--line); background:var(--bg); border-radius:5px; padding:3px 10px; cursor:pointer; font-size:12.5px; white-space:nowrap; }
-.btn.primary{ background:var(--dykem); border-color:var(--dykem); color:var(--surface); font-weight:600; }
-.btn.warn{ border-color:var(--bronze); color:var(--bronze); }
+.lim select{ width:100%; min-width:0; }
+.box{ display:flex; align-items:center; width:132px; height:22px; background:var(--field); border:1px solid var(--field-line); border-radius:2px; padding:0 6px; }
+.box input{ flex:1; min-width:0; height:20px; border:0; background:transparent; padding:0; text-align:left; }
+.box input:focus-visible{ outline:none; }
+.box:focus-within{ outline:2px solid var(--accent); outline-offset:1px; }
+.box span{ color:var(--muted); flex:none; padding-left:4px; }
+.lim .matrow{ display:flex; gap:6px; align-items:center; min-width:0; }
+.sub{ border-top:1px solid var(--row-line); margin-top:4px; }
+.sub > summary{ height:28px; display:flex; align-items:center; gap:6px; padding-left:0; color:var(--chev); cursor:pointer; list-style:none; }
+.sub > summary::-webkit-details-marker{ display:none; }
+.sub > summary::before{ content:"▸"; font-size:10px; width:10px; }
+.sub[open] > summary::before{ content:"▾"; }
+.sub .body{ padding:4px 0 6px; }
+.chk{ display:flex; gap:6px; align-items:center; cursor:pointer; white-space:nowrap; }
+.chk input{ height:auto; accent-color:var(--primary); margin:0; }
+.btn{ height:24px; border:1px solid var(--field-line); background:transparent; border-radius:2px; padding:0 12px; cursor:pointer; white-space:nowrap; color:var(--ink); }
+.btn.primary{ background:var(--primary); border-color:var(--primary); color:var(--primary-ink); font-weight:600; padding:0 18px; height:26px; }
+.btn.warn{ border-color:var(--warn); color:var(--warn); }
 .btn:disabled{ opacity:.45; cursor:default; }
-.locks{ display:flex; gap:12px; align-items:center; margin-top:8px; flex-wrap:wrap; }
 
-/* compare table */
+/* results table */
 table{ width:100%; border-collapse:collapse; }
-.cmp th{ font:500 11.5px var(--sans); color:var(--muted); text-align:right; padding:0 4px 3px; }
+.cmp th{ font-weight:400; color:var(--muted); text-align:right; padding:0 4px 3px; height:22px; border-bottom:1px solid var(--sec-line); }
 .cmp th:first-child{ text-align:left; padding-left:0; }
-.cmp td{ padding:3px 4px; text-align:right; border-top:1px solid var(--line); white-space:nowrap; }
-.cmp td:first-child{ text-align:left; color:var(--muted); padding-left:0; }
-.cmp td.v{ font:600 16px var(--num); font-variant-numeric:tabular-nums; }
-.cmp td.v.best{ color:var(--dykem); }
-.cmp td.u{ color:var(--muted); font-size:11.5px; text-align:left; padding-left:0; }
-.cmp td input{ width:58px; text-align:right; border:1px solid var(--line); border-radius:4px; background:var(--bg); padding:0 4px; font:600 15px var(--num); }
-.cmp tr.hero td{ border-top:2px solid var(--line); }
-.cmp tr.hero td.v{ font-size:19px; }
-.gain{ font:600 13px var(--num); color:var(--good); }
-.gain.down{ color:var(--bronze); }
-.bar{ display:inline-block; vertical-align:middle; width:44px; height:6px; border-radius:3px; background:var(--bg); border:1px solid var(--line); overflow:hidden; margin-left:4px; }
-.bar i{ display:block; height:100%; background:var(--dykem); }
-.verdict{ margin-top:6px; font-size:12.5px; color:var(--muted); }
+.cmp td{ padding:0 4px; height:23px; text-align:right; border-bottom:1px solid var(--row-line); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.cmp tr:last-child td{ border-bottom:0; }
+.cmp td:first-child{ text-align:left; color:var(--label); padding-left:0; }
+.cmp td.v.best{ font-weight:600; }
+.cmp td.u{ color:var(--muted); text-align:left; padding-left:6px; }
+.cmp td input{ width:64px; text-align:right; height:20px; }
+.cmp td.over{ color:var(--warn); }
+.cmp td.over::before{ content:"⚠ "; }
+.gain, .bar{ display:none; }
+.verdict{ position:relative; padding-left:18px; margin-top:6px; color:var(--chev); line-height:1.45; }
+.verdict:empty{ display:none; }
+.verdict::before{ content:"i"; position:absolute; left:0; top:2px; width:12px; height:12px; border:1.2px solid var(--info); border-radius:50%; color:var(--info); font:600 9px/10px var(--sans); text-align:center; }
 .verdict b{ color:var(--ink); font-weight:600; }
-.grid.four{ grid-template-columns:repeat(4,minmax(0,1fr)); }
-.fld input::placeholder{ color:var(--muted); font-weight:500; opacity:1; }
-.foot .ver{ font-size:11.5px; color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.foot .ver.on{ font-size:12.5px; color:var(--good); }
-canvas{ display:block; width:100%; height:84px; margin-top:6px; border-radius:5px; background:var(--bg); border:1px solid var(--line); }
-.leg{ display:flex; gap:12px; font-size:11px; color:var(--muted); margin-top:3px; }
-.leg i{ display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:3px; margin-right:4px; }
+canvas{ display:block; width:100%; height:128px; }
+.leg{ display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--label); margin-top:4px; padding-left:30px; }
+.leg i{ display:inline-block; width:16px; height:0; border-top:2px solid; vertical-align:3px; margin-right:5px; }
 
 /* bulk table */
-.bulk{ display:flex; flex-direction:column; min-height:0; }
-.bulk .scroll{ overflow-y:auto; overflow-x:hidden; max-height:calc(100vh - 330px); min-height:80px; margin-top:6px; }
-.bt td, .bt th{ padding:4px 4px; text-align:right; white-space:nowrap; }
-.bt th{ font:500 11.5px var(--sans); color:var(--muted); position:sticky; top:0; background:var(--surface); }
-.bt td{ border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.bulk .body{ min-height:0; }
+.bulk .scroll{ overflow-y:auto; overflow-x:hidden; max-height:calc(100vh - 330px); min-height:80px; }
+.bt td, .bt th{ padding:0 4px; height:24px; text-align:right; white-space:nowrap; }
+.bt th{ font-weight:400; color:var(--muted); position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--sec-line); }
+.bt td{ border-bottom:1px solid var(--row-line); font-variant-numeric:tabular-nums; }
 .bt td.l, .bt th.l{ text-align:left; }
 .bt{ table-layout:fixed; }
-.bt th:nth-child(1){ width:28px; } .bt th:nth-child(3){ width:66px; } .bt th:nth-child(4), .bt th:nth-child(5){ width:42px; } .bt th:nth-child(6){ width:42px; } .bt th:nth-child(7){ width:58px; }
-.bt select{ width:100%; font-size:12px; border:1px solid var(--line); border-radius:4px; background:var(--bg); padding:0 1px; }
-.bt select.fin{ color:var(--dykem); font-weight:600; }
+.bt th:nth-child(1){ width:30px; } .bt th:nth-child(3){ width:72px; } .bt th:nth-child(4), .bt th:nth-child(5){ width:44px; } .bt th:nth-child(6){ width:44px; } .bt th:nth-child(7){ width:64px; }
+.bt select{ width:100%; height:20px; padding:0 2px; }
+.bt select.fin{ font-weight:600; }
 .bt td.name{ overflow:hidden; text-overflow:ellipsis; }
-.bt td.why{ white-space:normal; line-height:1.3; }
+.bt td.why{ white-space:normal; line-height:1.3; padding:3px 4px; height:auto; }
 .bt td:last-child{ overflow:hidden; text-overflow:ellipsis; }
 .bt tr.okrow{ cursor:pointer; }
-.bt tr.okrow:hover td{ background:var(--row-hi); }
-.bt tr.skip td{ color:var(--muted); font-size:12px; }
-.bt .tn{ font:600 12px var(--num); color:var(--dykem); }
-.bt .q{ font:600 14px var(--num); }
-.sum{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--muted); margin-top:6px; }
-.sum b{ color:var(--ink); }
+.bt tr.okrow:hover td{ background:var(--hover); }
+.bt tr.skip td{ color:var(--muted); }
+.bt .tn{ color:var(--label); }
+.bt .gain{ display:inline; color:var(--muted); }
+.bt .q{ font-weight:400; }
+.sum{ display:flex; justify-content:space-between; gap:8px; color:var(--muted); margin-top:6px; }
+.sum b{ color:var(--ink); font-weight:600; }
+.sum .gain{ display:inline; color:var(--ink); }
 
-/* status + footer */
-.msg{ font-size:12.5px; border-radius:6px; padding:6px 9px; background:var(--warn-bg); color:var(--warn-ink); }
+/* messages + footer */
+.msg{ margin:8px 12px 0; padding:6px 8px; border:1px solid var(--warn); border-radius:2px; color:var(--ink); }
+.msg::before{ content:"⚠ "; color:var(--warn); }
 .msg:empty{ display:none; }
-.foot{ display:flex; gap:8px; align-items:center; margin-top:auto; padding-top:2px; }
-.foot a{ color:var(--dykem); font-size:12.5px; text-decoration:none; }
-.foot .sp{ flex:1; }
+.foot{ display:flex; gap:8px; align-items:center; margin-top:auto; padding:10px 12px; border-top:1px solid var(--sec-line); }
+.foot .ver{ color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.foot .ver.on{ color:var(--good); }
 .hidden{ display:none !important; }
 </style>
 </head>
 <body>
 <div class="app">
 
-  <section class="card op empty" id="opcard" aria-live="polite">
-    <div class="top">
-      <span class="tno hidden" id="tno"></span>
-      <span class="name" id="opname">No operation selected</span>
-      <span class="nav hidden" id="nav"><button type="button" id="prev" aria-label="Previous operation">‹</button><span id="navpos"></span><button type="button" id="next" aria-label="Next operation">›</button></span>
+  <details class="sec" open>
+    <summary>Operation</summary>
+    <div class="body op empty" id="opcard" aria-live="polite">
+      <div class="top">
+        <span class="tno hidden" id="tno"></span>
+        <span class="name" id="opname">No operation selected</span>
+        <span class="nav hidden" id="nav"><button type="button" id="prev" aria-label="Previous operation">‹</button><span id="navpos"></span><button type="button" id="next" aria-label="Next operation">›</button></span>
+      </div>
+      <div class="meta" id="opmeta">Click an operation in the CAM browser. Select several, or a whole setup, to optimize them together.</div>
+      <div class="passrow hidden" id="passrow">
+        <span>Pass</span>
+        <span class="ctl">
+          <span class="seg" role="group" aria-label="Pass type">
+            <button type="button" data-pass="rough" aria-pressed="false">Rough</button><button type="button" data-pass="wall" aria-pressed="false">Wall finish</button><button type="button" data-pass="floor" aria-pressed="false">Floor finish</button>
+          </span>
+          <span class="rule" id="passrule"></span>
+        </span>
+      </div>
     </div>
-    <div class="meta" id="opmeta">Click an operation in the CAM browser. Select several, or a whole setup, to optimize them together.</div>
-    <div class="passrow hidden" id="passrow">
-      <span>Pass</span>
-      <span class="seg" role="group" aria-label="Pass type">
-        <button type="button" data-pass="rough" aria-pressed="false">Rough</button><button type="button" data-pass="wall" aria-pressed="false">Wall finish</button><button type="button" data-pass="floor" aria-pressed="false">Floor finish</button>
-      </span>
-      <span class="rule" id="passrule"></span>
-    </div>
-  </section>
+  </details>
 
   <div class="tabs" role="tablist">
     <button type="button" role="tab" id="tabOne" aria-selected="true">This operation</button>
     <button type="button" role="tab" id="tabAll" aria-selected="false">All selected</button>
   </div>
 
-  <section class="card lim" aria-label="Limits">
-    <div class="row">
-      <span class="lbl">Material</span><select id="mat"></select>
-      <button type="button" class="btn warn hidden" id="matok" title="Save this material on the setup">Confirm</button>
-    </div>
-    <div class="grid four">
-      <div class="fld"><label for="Fmax">Max force</label><div class="box"><input id="Fmax" class="num" inputmode="decimal"><span>N</span></div></div>
-      <div class="fld"><label for="slopeMax">Max slope</label><div class="box"><input id="slopeMax" class="num" inputmode="decimal"><span>N/°</span></div></div>
-      <div class="fld"><label for="hexMax" id="hexLbl">Max chip</label><div class="box"><input id="hexMax" class="num" inputmode="decimal" title="Blank = typical value for the material and tool diameter"><span>mm</span></div></div>
-      <div class="fld"><label for="hmMin" id="hmLbl">Min chip</label><div class="box"><input id="hmMin" class="num" inputmode="decimal" title="Blank = typical rubbing threshold for the material"><span>mm</span></div></div>
-    </div>
-    <details id="more">
-      <summary id="moresum">More limits</summary>
-      <div class="grid">
-        <div class="fld"><label for="nmax">Max spindle</label><div class="box"><input id="nmax" class="num" inputmode="decimal"><span>rpm</span></div></div>
-        <div class="fld"><label for="vfmax">Max feed</label><div class="box"><input id="vfmax" class="num" inputmode="decimal"><span>mm/min</span></div></div>
-        <div class="fld"><label for="deflMax">Max deflection</label><div class="box"><input id="deflMax" class="num" inputmode="decimal"><span>mm</span></div></div>
-        <div class="fld"><label for="vcMin">Min v<sub>c</sub></label><div class="box"><input id="vcMin" class="num" inputmode="decimal"><span>m/min</span></div></div>
-        <div class="fld"><label for="vcMax">Max v<sub>c</sub></label><div class="box"><input id="vcMax" class="num" inputmode="decimal"><span>m/min</span></div></div>
-        <div class="fld"><label for="helixDefault">Helix if unknown</label><div class="box"><input id="helixDefault" class="num" inputmode="decimal"><span>°</span></div></div>
-        <div class="fld"><label for="pmax">Spindle power</label><div class="box"><input id="pmax" class="num" inputmode="decimal"><span>kW</span></div></div>
-        <div class="fld"><label for="eta">Efficiency</label><div class="box"><input id="eta" class="num" inputmode="decimal"></div></div>
-        <label class="chk" style="align-self:end"><input type="checkbox" id="usePow">Limit power</label>
-        <div class="fld"><label for="deflFinish" title="Deflection limit for wall and floor finishing passes">Finish deflection</label><div class="box"><input id="deflFinish" class="num" inputmode="decimal"><span>mm</span></div></div>
-        <div class="fld"><label for="clearance" title="Stock a wall finish leaves on the floor, and a floor finish leaves on the walls">Finish clearance</label><div class="box"><input id="clearance" class="num" inputmode="decimal"><span>mm</span></div></div>
+  <details class="sec lim" open>
+    <summary>Limits</summary>
+    <div class="body">
+      <div class="r">
+        <label for="mat">Material</label>
+        <span class="matrow"><select id="mat"></select><button type="button" class="btn warn hidden" id="matok" title="Save this material on the setup">Save to setup</button></span>
       </div>
-      <div class="row" style="margin-top:8px">
-        <span class="lbl">Profile</span><select id="lsel" aria-label="Limit profile"></select>
-        <button type="button" class="btn" id="lsave">Save as…</button>
-        <button type="button" class="btn" id="ldel">Delete</button>
-      </div>
-    </details>
-    <div class="locks">
-      <label class="chk"><input type="checkbox" id="keepAe">Keep stepover</label>
-      <label class="chk"><input type="checkbox" id="keepAp">Keep stepdown</label>
+      <div class="r"><label for="Fmax">Max force</label><div class="box"><input id="Fmax" class="num" inputmode="decimal"><span>N</span></div></div>
+      <div class="r"><label for="slopeMax">Max force slope</label><div class="box"><input id="slopeMax" class="num" inputmode="decimal"><span>N/deg</span></div></div>
+      <div class="r"><label for="hexMax" id="hexLbl">Max chip</label><div class="box"><input id="hexMax" class="num" inputmode="decimal" title="Blank = typical value for the material and tool diameter"><span>mm</span></div></div>
+      <div class="r"><label for="hmMin" id="hmLbl">Min chip</label><div class="box"><input id="hmMin" class="num" inputmode="decimal" title="Blank = typical rubbing threshold for the material"><span>mm</span></div></div>
+      <div class="r"><span></span><label class="chk"><input type="checkbox" id="keepAe">Keep stepover</label></div>
+      <div class="r"><span></span><label class="chk"><input type="checkbox" id="keepAp">Keep stepdown</label></div>
+      <details class="sub" id="more">
+        <summary id="moresum">More limits</summary>
+        <div class="body">
+          <div class="r"><label for="nmax">Max spindle</label><div class="box"><input id="nmax" class="num" inputmode="decimal"><span>rpm</span></div></div>
+          <div class="r"><label for="vfmax">Max feed</label><div class="box"><input id="vfmax" class="num" inputmode="decimal"><span>mm/min</span></div></div>
+          <div class="r"><label for="deflMax">Max deflection</label><div class="box"><input id="deflMax" class="num" inputmode="decimal"><span>mm</span></div></div>
+          <div class="r"><label for="vcMin">Min surface speed</label><div class="box"><input id="vcMin" class="num" inputmode="decimal"><span>m/min</span></div></div>
+          <div class="r"><label for="vcMax">Max surface speed</label><div class="box"><input id="vcMax" class="num" inputmode="decimal"><span>m/min</span></div></div>
+          <div class="r"><label for="helixDefault">Helix if unknown</label><div class="box"><input id="helixDefault" class="num" inputmode="decimal"><span>deg</span></div></div>
+          <div class="r"><label for="pmax">Spindle power</label><div class="box"><input id="pmax" class="num" inputmode="decimal"><span>kW</span></div></div>
+          <div class="r"><label for="eta">Efficiency</label><div class="box"><input id="eta" class="num" inputmode="decimal"></div></div>
+          <div class="r"><span></span><label class="chk"><input type="checkbox" id="usePow">Limit power</label></div>
+          <div class="r"><label for="deflFinish" title="Deflection limit for wall and floor finishing passes">Finish deflection</label><div class="box"><input id="deflFinish" class="num" inputmode="decimal"><span>mm</span></div></div>
+          <div class="r"><label for="clearance" title="Stock a wall finish leaves on the floor, and a floor finish leaves on the walls">Finish clearance</label><div class="box"><input id="clearance" class="num" inputmode="decimal"><span>mm</span></div></div>
+          <div class="r"><label for="lsel">Profile</label><span class="matrow"><select id="lsel"></select><button type="button" class="btn" id="lsave">Save as…</button><button type="button" class="btn" id="ldel">Delete</button></span></div>
+        </div>
+      </details>
     </div>
-  </section>
+  </details>
 
   <div class="msg" id="msg" role="status"></div>
 
   <!-- one operation -->
-  <section class="card" id="oneView" aria-label="Current and optimized cut">
-    <table class="cmp">
-      <thead><tr><th></th><th>Current</th><th>Optimized</th><th></th></tr></thead>
-      <tbody>
-        <tr><td>Spindle</td><td class="v num" id="c_n">–</td><td class="v num best" id="o_n">–</td><td class="u">rpm</td></tr>
-        <tr><td>Feed</td><td class="v num" id="c_vf">–</td><td class="v num best" id="o_vf">–</td><td class="u">mm/min</td></tr>
-        <tr><td>Stepover a<sub>e</sub></td><td class="v num"><input id="c_ae" inputmode="decimal" aria-label="Current stepover"></td><td class="v num best" id="o_ae">–</td><td class="u">mm</td></tr>
-        <tr><td>Stepdown a<sub>p</sub></td><td class="v num"><input id="c_ap" inputmode="decimal" aria-label="Current stepdown"></td><td class="v num best" id="o_ap">–</td><td class="u">mm</td></tr>
-        <tr><td>Feed/tooth f<sub>z</sub></td><td class="v num" id="c_fz">–</td><td class="v num best" id="o_fz">–</td><td class="u">mm</td></tr>
-        <tr class="hero"><td>Removal rate</td><td class="v num" id="c_q">–</td><td class="v num best" id="o_q">–</td><td class="u">cm³/min <span class="gain" id="gain"></span></td></tr>
-        <tr><td>Peak force</td><td class="v num" id="c_f">–</td><td class="v num best" id="o_f">–</td><td class="u">N<span class="bar"><i id="b_f"></i></span></td></tr>
-        <tr><td>Force slope</td><td class="v num" id="c_s">–</td><td class="v num best" id="o_s">–</td><td class="u">N/°<span class="bar"><i id="b_s"></i></span></td></tr>
-        <tr><td>Deflection</td><td class="v num" id="c_d">–</td><td class="v num best" id="o_d">–</td><td class="u">mm<span class="bar"><i id="b_d"></i></span></td></tr>
-      </tbody>
-    </table>
-    <p class="verdict" id="verdict"></p>
-    <canvas id="curve" aria-label="Cutting force through one revolution, current and optimized"></canvas>
-    <div class="leg"><span>0–360°, one revolution</span><span><i style="border-color:var(--muted)"></i>Current</span><span><i style="border-color:var(--dykem)"></i>Optimized</span><span><i style="border-color:var(--bronze);border-top-style:dashed"></i>Force limit</span></div>
+  <section id="oneView" aria-label="Current and optimized cut">
+    <details class="sec" open>
+      <summary>Results</summary>
+      <div class="body">
+        <table class="cmp">
+          <thead><tr><th></th><th>Current</th><th>Optimized</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>Spindle speed</td><td class="v num" id="c_n">–</td><td class="v num best" id="o_n">–</td><td class="u">rpm</td></tr>
+            <tr><td>Cutting feed</td><td class="v num" id="c_vf">–</td><td class="v num best" id="o_vf">–</td><td class="u">mm/min</td></tr>
+            <tr><td>Stepover (a<sub>e</sub>)</td><td class="v num"><input id="c_ae" inputmode="decimal" aria-label="Current stepover"></td><td class="v num best" id="o_ae">–</td><td class="u">mm</td></tr>
+            <tr><td>Stepdown (a<sub>p</sub>)</td><td class="v num"><input id="c_ap" inputmode="decimal" aria-label="Current stepdown"></td><td class="v num best" id="o_ap">–</td><td class="u">mm</td></tr>
+            <tr><td>Feed per tooth</td><td class="v num" id="c_fz">–</td><td class="v num best" id="o_fz">–</td><td class="u">mm</td></tr>
+            <tr class="hero"><td>Removal rate</td><td class="v num" id="c_q">–</td><td class="v num best" id="o_q">–</td><td class="u">cm³/min <span class="gain" id="gain"></span></td></tr>
+            <tr><td>Peak force</td><td class="v num" id="c_f">–</td><td class="v num best" id="o_f">–</td><td class="u">N<span class="bar"><i id="b_f"></i></span></td></tr>
+            <tr><td>Force slope</td><td class="v num" id="c_s">–</td><td class="v num best" id="o_s">–</td><td class="u">N/deg<span class="bar"><i id="b_s"></i></span></td></tr>
+            <tr><td>Deflection</td><td class="v num" id="c_d">–</td><td class="v num best" id="o_d">–</td><td class="u">mm<span class="bar"><i id="b_d"></i></span></td></tr>
+          </tbody>
+        </table>
+        <p class="verdict" id="verdict"></p>
+      </div>
+    </details>
+    <details class="sec" open>
+      <summary>Force over one revolution</summary>
+      <div class="body">
+        <canvas id="curve" aria-label="Cutting force through one revolution, current and optimized"></canvas>
+        <div class="leg"><span><i style="border-color:var(--curve-cur)"></i>Current</span><span><i style="border-color:var(--accent)"></i>Optimized</span><span><i style="border-color:var(--warn);border-top-style:dashed;border-top-width:1px"></i>Max force</span></div>
+      </div>
+    </details>
   </section>
 
   <!-- all selected -->
-  <section class="card bulk hidden" id="allView" aria-label="All selected operations">
-    <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-      <span style="font-size:12.5px;color:var(--muted)">Bulk keeps each operation’s stepover and stepdown unless you untick the boxes above. Finish passes always keep them.</span>
-    </div>
-    <div class="scroll">
-      <table class="bt">
-        <thead><tr><th class="l">T</th><th class="l">Operation</th><th class="l">Pass</th><th>Now</th><th>Best</th><th>Gain</th><th class="l">Limited by</th></tr></thead>
-        <tbody id="btbody"></tbody>
-      </table>
-    </div>
-    <div class="sum" id="bsum"></div>
+  <section class="bulk hidden" id="allView" aria-label="All selected operations">
+    <details class="sec" open>
+      <summary>Selected operations</summary>
+      <div class="body">
+        <span style="color:var(--muted)">Bulk keeps each operation’s stepover and stepdown unless you untick the boxes in Limits. Finish passes always keep them.</span>
+        <div class="scroll">
+          <table class="bt">
+            <thead><tr><th class="l">T</th><th class="l">Operation</th><th class="l">Pass</th><th>Now</th><th>Best</th><th>Gain</th><th class="l">Limited by</th></tr></thead>
+            <tbody id="btbody"></tbody>
+          </table>
+        </div>
+        <div class="sum" id="bsum"></div>
+      </div>
+    </details>
   </section>
 
   <div class="foot">
@@ -418,9 +434,19 @@ function materialFor(p){
   const m = materialChoice || p.material;
   return MATERIALS[m] ? m : DEFAULT_MAT;
 }
+/* Flute count: an override typed on the card wins (issue #1: a library can say 1 flute on a
+   3-flute tool). flutesHint reads "3 FLUTE", "3FL", "3 FLT" from the tool's description. */
+function flutesHint(p){ const m = /(\d+)\s*-?\s*(?:FLUTES?|FLT|FL)\b/i.exec(p.toolDesc || ""); return m ? +m[1] : null; }
+function flutesFor(p){
+  const o = overrides["z:" + toolKey(p)];
+  if(isFinite(o) && o >= 1) return { z:o, src:"typed" };
+  if(p.tool && p.tool.z >= 1) return { z:p.tool.z, src:"library" };
+  const h = flutesHint(p);
+  return h ? { z:h, src:"description" } : { z:null, src:"missing" };
+}
 function toolOf(p, L){
   const { kc1, mc } = MATERIALS[materialFor(p)];
-  return { D:p.tool.D, z:p.tool.z || 2, helix:helixFor(p, L).helix, kc1, mc, rake:0, kappa:90, fluteLen:p.tool.fluteLen };
+  return { D:p.tool.D, z:flutesFor(p).z || 2, helix:helixFor(p, L).helix, kc1, mc, rake:0, kappa:90, fluteLen:p.tool.fluteLen };
 }
 function geomOverride(p){ return overrides["geom:" + opKey(p)] || {}; }
 
@@ -589,10 +615,15 @@ function renderCard(){
   $("opname").textContent = p.operation;
   $("opname").title = `${p.operation} — ${p.setup}`;
   if(!p.ok){ $("opmeta").innerHTML = `${esc(p.strategyLabel || p.strategy)} · Setup <b>${esc(p.setup)}</b> · <span class="assumed">${esc(p.reason)}</span>`; return; }
-  const L = readLimits(), h = helixFor(p, L), so = stickoutFor(p);
+  const L = readLimits(), h = helixFor(p, L), so = stickoutFor(p), fl = flutesFor(p), hint = flutesHint(p);
+  const flWarn = fl.src === "missing" ? ' <span class="warn">not in library: enter it</span>'
+    : fl.src === "description" ? ' <span class="warn" title="The tool library has no flute count">from description</span>'
+    : (hint && hint !== fl.z) ? ` <span class="warn" title="The tool description says ${hint} flutes">⚠ description says ${hint}</span>`
+    : (fl.src === "typed" && p.tool.z && p.tool.z !== fl.z) ? ` <span class="warn" title="Typed here; the tool library says ${p.tool.z}">library says ${p.tool.z}</span>` : "";
   $("opmeta").innerHTML =
     `<span>${esc(p.strategyLabel || p.strategy)}</span>` +
-    `<span><b>Ø${g(p.tool.D,3)}</b> mm · <b>${p.tool.z ?? "?"}</b> fl${p.tool.fluteLen ? ` · ${g(p.tool.fluteLen,3)} long` : ""}</span>` +
+    `<span><b>Ø${g(p.tool.D,3)}</b> mm${p.tool.fluteLen ? ` · ${g(p.tool.fluteLen,3)} long` : ""}</span>` +
+    `<span>flutes <input id="zin" class="num" value="${fl.z ?? ""}" inputmode="numeric" aria-label="Number of flutes">${flWarn}</span>` +
     `<span>helix <input id="helix" class="num" value="${h.helix}" inputmode="decimal" aria-label="Helix angle">°${h.assumed ? ' <span class="assumed" title="This tool has no helix angle in Fusion">assumed</span>' : ""}</span>` +
     `<span>stickout <input id="so" class="num" value="${+g(so.so,3).replace(/,/g,"")}" inputmode="decimal" aria-label="Tool stickout">mm${so.assumed ? ' <span class="assumed" title="Not read from the tool: assumed 1.25 × flute length">assumed</span>' : ""}</span>` +
     `<span>Setup <b>${esc(p.setup)}</b></span>` +
@@ -600,6 +631,11 @@ function renderCard(){
   $("helix").addEventListener("change", e => {
     const v = parseFloat(e.target.value);
     if(isFinite(v) && v >= 0) overrides[toolKey(p)] = v; else delete overrides[toolKey(p)];
+    saveWorking(); results = {}; renderCard(); schedule();
+  });
+  $("zin").addEventListener("change", e => {
+    const v = Math.round(parseFloat(e.target.value));
+    if(isFinite(v) && v >= 1 && v <= 16 && v !== p.tool.z) overrides["z:" + toolKey(p)] = v; else delete overrides["z:" + toolKey(p)];
     saveWorking(); results = {}; renderCard(); schedule();
   });
   $("so").addEventListener("change", e => {
@@ -623,7 +659,8 @@ function setCell(id, v, s){ $(id).textContent = typeof v === "string" ? v : g(v,
 function renderOne(){
   const p = ops[idx], L = readLimits();
   const ids = ["c_n","c_vf","c_fz","c_q","c_f","c_s","c_d","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_f","o_s","o_d"];
-  ids.forEach(i => $(i).textContent = "–"); $("gain").textContent = ""; $("verdict").textContent = "";
+  ids.forEach(i => $(i).textContent = "–"); $("gain").textContent = "";
+  ["c_f","c_s","c_d"].forEach(i => { $(i).classList.remove("over"); $(i).title = ""; }); $("verdict").textContent = "";
   $("b_f").style.width = "0"; $("b_s").style.width = "0"; $("b_d").style.width = "0";
   if(!p || !p.ok){ $("c_ae").value = ""; $("c_ap").value = ""; drawCurve(null, null, L); return; }
   const geo = currentGeom(p);
@@ -655,6 +692,10 @@ function renderOne(){
     if(opt.snapped) v += " Depth sits just under a whole flute pitch, where force is smoothest.";
     if(cur){
       const over = CutOpt.checkLimits(cur, Lo, cur.n).map(x => limitName(x.limit, Lo));
+      const mark = (id, bad, what) => { if(bad){ $(id).classList.add("over"); $(id).title = `Over your ${what} limit`; } };
+      mark("c_f", L.Fmax > 0 && cur.peak > L.Fmax * 1.005, "force");
+      mark("c_s", L.slopeMax > 0 && cur.robustSlope > L.slopeMax * 1.005, "force slope");
+      mark("c_d", dl > 0 && cur.defl > dl * 1.005, "deflection");
       if(over.length) v += ` The current cut is over your ${[...new Set(over)].join(", ")} limit.`;
     } else v += " Couldn’t read the current cut fully, so there’s nothing to compare.";
     if(!(L.vfmax > 0) && b.ae <= 0.021 * p.tool.D) v += ` Stepover is at its 2% floor with a ${f(b.vf,0)} mm/min feed: set <b>Max feed</b> (More limits) to what your machine can really do.`;
@@ -687,7 +728,7 @@ function renderAll(){
     n++;
     tr.className = "okrow"; tr.title = "Open this operation";
     tr.innerHTML = tcell + ncell + pcell + `<td class="q">${cur ?g(cur.Q,3) : "–"}</td><td class="q" style="color:var(--dykem)">${g(opt.best.Q,3)}</td>` +
-      `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td><td class="l" style="color:var(--muted)" title="${esc(opt.best.bindLabel)}">${esc(SHORT_LIMIT[opt.best.bindLabel] || opt.best.bindLabel)}</td>`;
+      `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td>${flutesInDoubt(p) ? `<td class="l" style="color:var(--warn)" title="The tool library and description disagree on the flute count. Open the operation and enter it; Apply skips it until then.">⚠ flutes</td>` : `<td class="l" style="color:var(--muted)" title="${esc(opt.best.bindLabel)}">${esc(SHORT_LIMIT[opt.best.bindLabel] || opt.best.bindLabel)}</td>`}`;
     tr.addEventListener("click", e => { if(e.target.closest("select")) return; idx = i; setMode("one"); });
     tb.appendChild(tr);
   });
@@ -706,9 +747,13 @@ function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne
    in) to each op, plus stock to leave for finish passes, then regenerates. Two clicks: the
    first arms the button for 4 s. Python checks every write and puts an op back on failure. */
 let applyArm = 0, busy = false;
+function flutesInDoubt(p){
+  const fl = flutesFor(p), h = flutesHint(p);
+  return fl.src === "missing" || (fl.src !== "typed" && h && h !== fl.z);
+}
 function applyTargets(){
   const todo = mode === "one" ? (ops[idx] ? [ops[idx]] : []) : readable();
-  return todo.filter(p => { const R = p.ok && results[opKey(p)]; return R && R.opt && R.opt.ok; });
+  return todo.filter(p => { const R = p.ok && results[opKey(p)]; return R && R.opt && R.opt.ok && !flutesInDoubt(p); });
 }
 function applyItem(p){
   const b = results[opKey(p)].opt.best, ps = passFor(p), it = { id:opKey(p), n:b.n, vf:b.vf, pass:ps };
@@ -723,7 +768,9 @@ function renderApply(){
   const btn = $("apply"), t = applyTargets(), n = t.length;
   btn.disabled = !FUSION || busy || !n;
   btn.textContent = busy ? "Applying…" : applyArm ? `Confirm: write ${n} op${n === 1 ? "" : "s"}` : n > 1 ? `Apply to ${n} ops` : "Apply";
-  btn.title = !FUSION ? "Open this panel in Fusion to apply" : !n ? "Nothing optimized to apply yet"
+  const doubt = (mode === "one" ? (ops[idx] && ops[idx].ok ? [ops[idx]] : []) : readable()).filter(flutesInDoubt).length;
+  btn.title = !FUSION ? "Open this panel in Fusion to apply" : doubt && !n ? "Check the flute count first: the tool library and its description disagree"
+    : !n ? "Nothing optimized to apply yet"
     : "Write spindle speed and feed (and stock to leave for finish passes), then regenerate the toolpaths";
 }
 function onApply(){
@@ -767,22 +814,36 @@ function reread(status, problems){
    Same style as the calculator: tangential force over one revolution (0–360°), 0 N at the
    bottom, a grid line every 90°. The optimized cut is the filled curve, the current cut the
    grey line, the force limit dashed. Nothing is filtered; samples are every 0.1°. */
+function niceTop(v){ const e = Math.pow(10, Math.floor(Math.log10(v))), m = v / e; return (m <= 1 ? 1 : m <= 1.5 ? 1.5 : m <= 2 ? 2 : m <= 3 ? 3 : m <= 4 ? 4 : m <= 5 ? 5 : m <= 6 ? 6 : m <= 8 ? 8 : 10) * e; }
 function drawCurve(cur, best, L){
-  const cv = $("curve"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 300, H = cv.clientHeight || 84;
+  const cv = $("curve"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 300, H = cv.clientHeight || 128;
   cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
   const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
-  ctx.strokeStyle = tok("--line"); ctx.lineWidth = 1;
-  for(let q=1;q<4;q++){ const x = W*q/4; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  const left = 30, bottom = 16, top0 = 6, pw = W - left - 1, ph = H - bottom - top0;
+  ctx.fillStyle = tok("--field"); ctx.fillRect(left, top0, pw, ph);
+  ctx.strokeStyle = tok("--field-line"); ctx.lineWidth = 1; ctx.strokeRect(left + .5, top0 + .5, pw - 1, ph - 1);
   const peaks = [cur && cur.forces ? cur.peak : 0, best && best.forces ? best.peak : 0, L.Fmax || 0];
-  const top = Math.max(...peaks) * 1.08; if(!(top > 0)) return;
-  const pad = 4, Y = v => H - pad - v/top*(H - 2*pad);
-  const path = F => { const n = F.length; ctx.beginPath(); for(let i=0;i<=n;i++){ const x = W*i/n, y = Y(F[i % n]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); } };
-  if(best && best.forces){
-    path(best.forces); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fillStyle = tok("--dykem-soft"); ctx.fill();
-    path(best.forces); ctx.strokeStyle = tok("--dykem"); ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+  const top = niceTop(Math.max(...peaks, 1) * 1.05);
+  const X = i => left + pw * i, Y = v => top0 + ph - v / top * ph;
+  ctx.font = `10px ${tok("--sans")}`; ctx.fillStyle = tok("--muted"); ctx.textBaseline = "middle"; ctx.textAlign = "right";
+  for(let k = 0; k <= 3; k++){
+    const v = top * k / 3, y = Math.round(Y(v)) + .5;
+    if(k > 0 && k < 3){ ctx.strokeStyle = tok("--row-line"); ctx.beginPath(); ctx.moveTo(left + 1, y); ctx.lineTo(left + pw - 1, y); ctx.stroke(); }
+    ctx.fillText(g(v, 2), left - 4, Math.min(Math.max(y, top0 + 5), top0 + ph - 4));
   }
-  if(cur && cur.forces){ path(cur.forces); ctx.strokeStyle = tok("--muted"); ctx.lineWidth = 1.5; ctx.stroke(); }
-  if(L.Fmax){ ctx.setLineDash([5,4]); ctx.strokeStyle = tok("--bronze"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, Y(L.Fmax)); ctx.lineTo(W, Y(L.Fmax)); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  [0, 90, 180, 270, 360].forEach(d => {
+    const x = Math.round(X(d / 360)) + .5;
+    if(d > 0 && d < 360){ ctx.strokeStyle = tok("--row-line"); ctx.beginPath(); ctx.moveTo(x, top0 + 1); ctx.lineTo(x, top0 + ph - 1); ctx.stroke(); }
+    ctx.textAlign = d === 0 ? "left" : d === 360 ? "right" : "center";
+    ctx.fillText(d + "°", d === 0 ? left : d === 360 ? left + pw : x, top0 + ph + 3);
+  });
+  ctx.save(); ctx.beginPath(); ctx.rect(left + 1, top0 + 1, pw - 2, ph - 2); ctx.clip();
+  const path = F => { const n = F.length; ctx.beginPath(); for(let i=0;i<=n;i++){ const x = X(i/n), y = Y(F[i % n]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); } };
+  if(L.Fmax){ ctx.setLineDash([4,3]); ctx.strokeStyle = tok("--warn"); ctx.lineWidth = 1; ctx.beginPath(); const y = Math.round(Y(L.Fmax)) + .5; ctx.moveTo(left, y); ctx.lineTo(left + pw, y); ctx.stroke(); ctx.setLineDash([]); }
+  if(cur && cur.forces){ path(cur.forces); ctx.strokeStyle = tok("--curve-cur"); ctx.lineWidth = 1.5; ctx.lineJoin = "round"; ctx.stroke(); }
+  if(best && best.forces){ path(best.forces); ctx.strokeStyle = tok("--accent"); ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke(); }
+  ctx.restore();
 }
 
 /* ---------- running ---------- */
