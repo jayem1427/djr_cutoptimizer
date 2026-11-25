@@ -1,6 +1,6 @@
 # CLAUDE.md: working on djr_cutoptimizer
 
-A Fusion add-in (Python) that opens the djr_cutcalculator page in a palette, fills it from the selected CAM operation, and optimizes feeds and speeds. The owner runs a LemonTart CNC mill on LinuxCNC (2.2 kW, 24,000 rpm, ER16), mostly cutting 6061. Read `README.md` for user-facing behaviour.
+A Fusion add-in (Python) that opens the djr_cutcalculator page in a palette, fills it from the selected CAM operation, and optimizes feeds and speeds. The owner runs a LemonTart CNC mill on LinuxCNC (Jianken JGD-80/1.5R24: 1.5 kW, 24,000 rpm, 400 Hz constant torque ≈ 0.6 N·m, 4.2 A, ER16), mostly cutting 6061. Read `README.md` for user-facing behaviour.
 
 ## Where things live
 

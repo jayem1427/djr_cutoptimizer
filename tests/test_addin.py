@@ -252,6 +252,31 @@ class BuildPayload(unittest.TestCase):
                                       cam_mapping.params_to_dict(op.tool.parameters))
         self.assertAlmostEqual(p['op']['ae'], 6)
 
+    def _ae_max(self, dev_row=None, strategy='adaptive'):
+        rows = [('tool_spindleSpeed', '24000 rpm', 24000), ('tool_feedCutting', '3000 mm/min', 300.0),
+                ('optimalLoad', '1 mm', 0.1), ('maximumStepdown', '15 mm', 1.5)] + ([dev_row] if dev_row else [])
+        op = _fake_op(strategy, op_rows=rows)
+        return cam_mapping.build_payload(strategy, cam_mapping.params_to_dict(op.parameters),
+                                         cam_mapping.params_to_dict(op.tool.parameters))['op'].get('aeMax')
+
+    def test_optimal_load_cap_fixed_deviation(self):
+        self.assertAlmostEqual(self._ae_max(('loadDeviation', '0.6 mm', 0.06)), 5.34)     # 0.99*6 - 0.6
+
+    def test_optimal_load_cap_relative_deviation(self):
+        # "optimalLoad * 0.2" reads 0.2 mm at 1 mm load, so load + deviation = 1.2 * load
+        self.assertAlmostEqual(self._ae_max(('loadDeviation', 'optimalLoad * 0.2', 0.02)), 4.95)   # 5.94/1.2
+
+    def test_optimal_load_cap_unreadable_deviation(self):
+        self.assertAlmostEqual(self._ae_max(), 4.74)                                        # (0.99-0.2)*6
+
+    def test_no_cap_without_optimal_load(self):
+        rows = [('tool_spindleSpeed', '24000 rpm', 24000), ('tool_feedCutting', '3000 mm/min', 300.0),
+                ('stepover', '1 mm', 0.1), ('maximumStepdown', '5 mm', 0.5)]
+        op = _fake_op('contour2d', op_rows=rows)
+        p = cam_mapping.build_payload('contour2d', cam_mapping.params_to_dict(op.parameters),
+                                      cam_mapping.params_to_dict(op.tool.parameters))
+        self.assertNotIn('aeMax', p['op'])
+
     def test_refused(self):
         for s in ('drill', 'thread', 'parallel', 'some_new_thing'):
             p = cam_mapping.build_payload(s, {}, {})
@@ -408,6 +433,13 @@ class PlanWrites(unittest.TestCase):
         with self.assertRaises(ValueError):
             P(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'wall'}, -1, self.STOCK)
 
+    def test_optimal_load_over_fusion_limit_is_refused(self):
+        with self.assertRaises(ValueError) as e:
+            cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 3000, 'ae': 5.9}, 0.05, None, ae_max=5.34)
+        self.assertIn('5.34 mm', str(e.exception))
+        w = cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 3000, 'ae': 5.34}, 0.05, None, ae_max=5.34)
+        self.assertIn(('optimalLoad', '5.34 mm'), [(n, x) for n, x, _, _ in w])
+
     def test_write_matches(self):
         M = cam_mapping.write_matches
         self.assertTrue(M('rpm', 18000, '18000 rpm', 18000))
@@ -461,6 +493,18 @@ class Apply(unittest.TestCase):
         self.assertEqual(P.expr('radialStockToLeave'), '0.3 mm')
         self.assertIs(P.itemByName('stockToLeave').value.value, False)
         self.assertFalse(OptimizerCommand.revert()['ok'])        # nothing left to revert
+
+    def test_apply_refuses_optimal_load_over_99_percent(self):
+        rows = [('tool_spindleSpeed', '24000 rpm', 24000), ('tool_feedCutting', '3000 mm/min', 300.0),
+                ('optimalLoad', '1 mm', 0.1), ('maximumStepdown', '15 mm', 1.5), ('loadDeviation', '0.6 mm', 0.06)]
+        op = _fake_op('adaptive', op_rows=rows, name='Adaptive')
+        p = self._select(op)['Adaptive']
+        self.assertAlmostEqual(p['op']['aeMax'], 5.34)
+        r = OptimizerCommand.apply([{'id': p['id'], 'n': 24000, 'vf': 3000, 'pass': 'rough', 'ae': 6.0}], 0.05)
+        self.assertEqual(r['applied'], 0)
+        self.assertIn('99 %', r['results'][0]['reason'])
+        self.assertEqual(op.parameters.expr('optimalLoad'), '1 mm')               # nothing written
+        self.assertEqual(op.parameters.expr('tool_spindleSpeed'), '24000 rpm')
 
     def test_failed_write_puts_the_op_back(self):
         op = _fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall')

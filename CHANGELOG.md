@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.2 — 2026-11-25
+
+**Fixed: "Optimal Load … should not exceed 99% of the tool diameter."** With *Keep stepover* off, the optimizer could pick a stepover up to the full tool diameter. On an adaptive, Fusion refuses to generate when the optimal load plus the load deviation is over 99% of the diameter. The panel now reads the operation's load deviation and never suggests more than that allows: 0.99·D − deviation, or 0.99·D ÷ (1 + ratio) when the deviation is written as a fraction of the optimal load. If the deviation can't be read, it assumes 20% of the diameter. Apply also refuses to write an optimal load over the cap, so a stale panel can't cause it either.
+
+If an operation already shows the error, use **Revert** (in the same Fusion session), or reselect it and Apply again.
+
+**Max stepover.** New limit under More limits, 40% of the tool diameter by default. The optimizer used to search all the way to a full-width cut, and with generous force and slope limits it picked one, which isn't how anyone runs an adaptive. It doesn't apply to a stepover you keep, or to slots.
+
+**Spindle defaults** now match a 1.5 kW, 24,000 rpm constant-torque spindle (Jianken JGD-80/1.5R24): 1.5 kW, 0.6 N·m, efficiency 0.8. The old 0.89 N·m was the torque of a 2.2 kW spindle. Saved working limits and profiles keep their own values, so check yours under More limits.
+
 ## v0.5.1 — 2026-11-25
 
 **Fixed: panel half light, half dark (#6).** On some systems, after Apply the lower part of the panel (Results, the force graph, Revert) lost its dark background, leaving light text on Fusion's light gray. Every part of the panel now paints its own background, and the panel repaints itself after Apply, Revert, a selection change, and when it's shown, focused or resized.
