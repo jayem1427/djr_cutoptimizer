@@ -22,9 +22,12 @@
   color-scheme: light;
 }
 *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
-html,body{ height:100%; }
-body{ background:var(--bg); color:var(--ink); font:12px/1.35 var(--sans); -webkit-font-smoothing:antialiased; }
-.app{ display:flex; flex-direction:column; min-height:100%; max-width:640px; margin:0 auto; }
+/* Every layer paints its own opaque background (issue #6). Fusion's palette view can be transparent,
+   and Qt WebEngine doesn't always repaint the propagated canvas background after the page grows,
+   so light text ended up over Fusion's light gray. Don't rely on body→canvas propagation. */
+html{ background:var(--bg); min-height:100%; }
+body{ background:var(--bg); color:var(--ink); font:12px/1.35 var(--sans); -webkit-font-smoothing:antialiased; min-height:100vh; }
+.app{ display:flex; flex-direction:column; min-height:100vh; max-width:640px; margin:0 auto; background:var(--bg); }
 .num{ font-variant-numeric:tabular-nums; }
 button, input, select{ font:inherit; color:inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
@@ -33,7 +36,7 @@ input::placeholder{ color:var(--muted); opacity:1; }
 input:disabled, select:disabled{ opacity:.55; }
 
 /* sections: a collapsible group header, then rows */
-.sec{ border-bottom:1px solid var(--sec-line); }
+.sec{ border-bottom:1px solid var(--sec-line); background:var(--bg); }
 .sec > summary{ height:30px; display:flex; align-items:center; gap:6px; padding:0 12px; font-weight:600; cursor:pointer; list-style:none; user-select:none; }
 .sec > summary::-webkit-details-marker{ display:none; }
 .sec > summary::before{ content:""; width:10px; height:10px; flex:none; background:var(--chev);
@@ -140,7 +143,7 @@ canvas{ display:block; width:100%; height:128px; }
 .msg{ margin:8px 12px 0; padding:6px 8px; border:1px solid var(--warn); border-radius:2px; color:var(--ink); }
 .msg::before{ content:"⚠ "; color:var(--warn); }
 .msg:empty{ display:none; }
-.foot{ display:flex; gap:8px; align-items:center; margin-top:auto; padding:10px 12px; border-top:1px solid var(--sec-line); }
+.foot{ display:flex; gap:8px; align-items:center; margin-top:auto; padding:10px 12px; border-top:1px solid var(--sec-line); background:var(--bg); }
 .foot .ver{ color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .foot .ver.on{ color:var(--good); }
 .hidden{ display:none !important; }
@@ -331,7 +334,7 @@ function send(action, obj){
 window.fusionJavaScriptHandler = {
   handle(action, data){
     try{
-      if(action === "selectionChanged") loadOps(JSON.parse(data));
+      if(action === "selectionChanged") { loadOps(JSON.parse(data)); repaint(); }
       else if(action === "fusionStatus") setMsg(JSON.parse(data).message || "");
     }catch(e){ console.error("fusionJavaScriptHandler", action, e); }
     return "OK";
@@ -803,8 +806,18 @@ function onRevert(){
 }
 /* Read the ops again so Current shows what Fusion now holds. Success goes in the footer,
    problems in the message box. */
+/* Qt WebEngine sometimes leaves part of the palette unpainted while Fusion is busy (issue #6).
+   Promoting the page to its own layer for one frame makes it repaint everything. */
+function repaint(){
+  const s = document.documentElement.style;
+  s.transform = "translateZ(0)";
+  requestAnimationFrame(() => requestAnimationFrame(() => { s.transform = ""; }));
+}
+addEventListener("focus", repaint);
+addEventListener("resize", repaint);
+document.addEventListener("visibilitychange", () => { if(!document.hidden) repaint(); });
 function reread(status, problems){
-  const done = () => { setStatus(status); setMsg(problems); renderApply(); };
+  const done = () => { setStatus(status); setMsg(problems); renderApply(); repaint(); setTimeout(repaint, 1500); };
   send("readOps", {}).then(r => { loadOps(r, true); done(); }, done);
 }
 
