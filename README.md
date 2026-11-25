@@ -4,11 +4,11 @@ A Fusion add-in that picks **feeds, speeds, stepover and stepdown** for your CAM
 
 Click an operation in the Manufacture browser, and a compact panel shows the current cut next to the best one inside your limits. Shift-select several operations (or a whole setup), mark each as rough, wall finish or floor finish, and **Apply** writes the suggested feeds and speeds to all of them.
 
-> **Status: v0.4. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
+> **Status: v0.5. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
 
 | One operation | All selected |
 |---|---|
-| ![The panel for one operation: operation card, limits, current vs optimized, force curve](docs/images/panel-operation.png) | ![The bulk view: one row per operation with removal rate now, best, gain and limiting factor](docs/images/panel-bulk.png) |
+| ![The panel for one operation: operation, limits, current vs optimized, force curve](docs/images/panel-operation.png) | ![The bulk view: one row per operation with removal rate now, best, gain and limiting factor](docs/images/panel-bulk.png) |
 
 <sub>Renderings of the panel at Fusion's panel size, with a sample setup (a 1/4" 3-flute tool in 6061). They aren't Fusion screenshots.</sub>
 
@@ -25,10 +25,10 @@ To upgrade, replace the folder, then **Stop** and **Run** the add-in (or restart
 ## Use
 
 1. In **Manufacture**, click **Optimize feeds & speeds** in the **Actions** panel. The panel opens on the right.
-2. Click an operation in the CAM browser. The **card** at the top names what you're optimizing: tool number, operation, strategy, tool Ø, flutes, helix, stickout and setup. Below it is the current cut next to the best one inside your limits, with the removal-rate gain. It re-optimizes whenever you click another operation or change a limit.
+2. Click an operation in the CAM browser. The **Operation** section at the top names what you're optimizing: tool number, operation, strategy, tool Ø, flutes, helix, stickout and setup. **Results** shows the current cut next to the best one inside your limits, with the removal-rate gain, and **Force over one revolution** graphs both. It re-optimizes whenever you click another operation or change a limit.
 3. **Bulk:** Shift- or Ctrl-click several operations, or click a whole setup, and open **All selected**. Each row shows the pass type, the removal rate now and the best, the gain, and what limits it. Operations the model doesn't cover say why. Click a row to open it.
-4. The first time for each setup, pick the stock **material** and press **Confirm**. It's saved on the setup.
-5. Check the tool's **helix** and **stickout** on the card. Fusion tools often lack them; values marked *assumed* are guesses (helix 35°, stickout 1.25 × flute length). Enter them once per tool. The **flute count** comes from the tool library, so make sure the tool is set up correctly there.
+4. The first time for each setup, pick the stock **material** and click **Save to setup**. It's saved on the setup.
+5. Check the tool's **helix** and **stickout** under Operation. Fusion tools often lack them; values marked *assumed* are guesses (helix 35°, stickout 1.25 × flute length). Enter them once per tool. The **flute count** comes from the tool library, so make sure the tool is set up correctly there.
 6. Set each operation's **pass**: **Rough**, **Wall finish** or **Floor finish** (see below).
 7. Click **Apply** (or **Apply to N ops** in bulk), then click again within 4 s to confirm. Spindle speed and cutting feed are written and the toolpaths regenerate. **Revert** puts the last Apply back.
 
@@ -111,7 +111,7 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 | Force curve | exact integral of k<sub>c</sub>·f<sub>z</sub>·sin θ along each helical flute, sampled every 0.1° |
 | Deflection | δ = F<sub>peak</sub>·L³ / (3·E·I), I = π(0.8·D)⁴/64, E = 600 GPa (carbide), L = stickout |
 
-**The force graph** is the tangential force on the tool through one revolution, 0–360° left to right, 0 N at the bottom, a grid line every 90°. The filled curve is the optimized cut, the grey line the current cut, and the dashed line your force limit. Nothing is filtered or smoothed. It is the exact integral rather than the older sliced approximation, which added sawtooth spikes. Light, deep cuts at a smooth depth look nearly flat; that's real, not smoothing.
+**The force graph** is the tangential force on the tool through one revolution, 0–360° left to right, 0 N at the bottom, a grid line every 90°. The blue line is the optimized cut, the grey line the current cut, and the amber dashed line your force limit. Nothing is filtered or smoothed. It is the exact integral rather than the older sliced approximation, which added sawtooth spikes. Light, deep cuts at a smooth depth look nearly flat; that's real, not smoothing.
 
 **Deflection** uses the peak force, not the mean force the calculator used, so it's the worst case through the revolution. A deflection limit becomes the force it allows at the tool's stickout.
 
@@ -134,8 +134,8 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 
 | | |
 |---|---|
-| Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3). Reading a real 3D Adaptive roughing operation, and Apply on it in v0.4.1: spindle speed, feed and stepover were written, read back and the toolpath regenerated. That confirms `tool_spindleSpeed`, `tool_feedCutting` and `optimalLoad`. |
-| Verified by tests | The model and optimizer against the Sandvik and HSM reference cuts (15 Node tests). 40 Python tests against a fake Fusion API: reading operations, expanding setups, skipping unsupported operations, storing the material, limit profiles, and no crash with no document, no CAM data or nothing selected. For Apply, they also cover the write plan for each pass type, read-back checks, rollback when Fusion refuses a value or a parameter is locked, partial bulk applies, and Revert. The panel itself (pass defaults, finish engagement, the two-click Apply, the payload sent to Fusion, Revert, bulk) is driven by a fake Fusion bridge in headless Chrome. |
+| Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3), and the v0.5 panel shows a tool's flute count from the tool library. Reading a real 3D Adaptive roughing operation, and Apply on it in v0.4.1: spindle speed, feed and stepover were written, read back and the toolpath regenerated. That confirms `tool_spindleSpeed`, `tool_feedCutting` and `optimalLoad`. |
+| Verified by tests | The model and optimizer against the Sandvik and HSM reference cuts (15 Node tests). 42 Python tests against a fake Fusion API: reading operations, expanding setups, skipping unsupported operations, storing the material, limit profiles, and no crash with no document, no CAM data or nothing selected. For Apply, they also cover the write plan for each pass type, read-back checks, rollback when Fusion refuses a value or a parameter is locked, partial bulk applies, and Revert. The panel itself (pass defaults, finish engagement, the two-click Apply, the payload sent to Fusion, Revert, bulk) is driven by a fake Fusion bridge in headless Chrome. |
 | Not verified yet | Wall and floor finish passes (stock to leave), Revert, Apply on a pocket, contour or slot, and bulk Apply on several operations. |
 | Unverified names | The other CAM parameter names in `commands/optimizer/cam_mapping.py`: `maximumStepdown` (read, not yet written), `radialStockToLeave`, `axialStockToLeave`, `stockToLeave`, `tool_bodyLength`, …. A wrong name makes Apply refuse that operation with a message; it doesn't write somewhere else. |
 
