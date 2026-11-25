@@ -77,6 +77,9 @@ def main() -> None:
     manifest_version, config_version = read_versions()
     if manifest_version != config_version:
         sys.exit(f"version mismatch: manifest {manifest_version} vs config.py {config_version}")
+    panel = re.search(r'^const VERSION = "([^"]+)"', (ROOT / "web" / "panel.html").read_text(encoding="utf-8"), re.M)
+    if not panel or panel.group(1) != manifest_version:
+        sys.exit(f"version mismatch: manifest {manifest_version} vs web/panel.html {panel and panel.group(1)}")
     if args.tag and args.tag != f"v{manifest_version}":
         sys.exit(f"tag {args.tag} does not match version v{manifest_version}")
     notes = release_notes(manifest_version)

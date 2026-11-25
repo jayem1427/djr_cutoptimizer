@@ -62,7 +62,7 @@ None of this replaces a real Fusion run. Be explicit about what was verified in 
 
 ## Releasing
 
-1. Bump `"version"` in `djr_cutoptimizer.manifest` **and** `PLUGIN_VERSION` in `config.py`.
+1. Bump `"version"` in `djr_cutoptimizer.manifest`, `PLUGIN_VERSION` in `config.py` **and** `const VERSION` in `web/panel.html` (`build_release.py --check` enforces all three).
 2. Add `## vX.Y.Z — date` to `CHANGELOG.md`. The release notes are `tools/release_intro.md` (summary and screenshots pinned to the tag), then that body as "What's new", then `tools/release_install.md` (install and quick start).
 3. Push to `main`, then `git tag vX.Y.Z && git push origin vX.Y.Z`. `.github/workflows/release.yml` tests, builds `djr_cutoptimizer-vX.Y.Z.zip` and `djr_dump_cam_params-vX.Y.Z.zip`, and publishes the release. A tag that doesn't match the version fails on purpose.
 

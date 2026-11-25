@@ -27,7 +27,7 @@ To upgrade, replace the folder, then **Stop** and **Run** the add-in (or restart
 ## Use
 
 1. In **Manufacture**, click **Optimize feeds & speeds** in the **Actions** panel. The panel opens on the right.
-2. Click an operation in the CAM browser. The **Operation** section at the top names what you're optimizing: tool number, operation, strategy, tool Ø, flutes, helix, stickout and setup. **Results** shows the current cut next to the best one inside your limits, with the removal-rate gain, and **Force over one revolution** graphs both. It re-optimizes whenever you click another operation or change a limit.
+2. Click an operation in the CAM browser. The **Operation** section at the top names what you're optimizing: tool number, operation, strategy, tool Ø, flutes, helix, stickout and setup. **Results** shows the current cut next to the best one inside your limits (feeds, speeds, removal rate, spindle power and torque at the motor, peak force, slope and deflection), with the removal-rate gain, and **Force over one revolution** graphs both. It re-optimizes whenever you click another operation or change a limit.
 3. **Bulk:** Shift- or Ctrl-click several operations, or click a whole setup, and open **All selected**. Each row shows the pass type, the removal rate now and the best, the gain, and what limits it. Operations the model doesn't cover say why. Click a row to open it.
 4. The first time for each setup, pick the stock **material** and click **Save to setup**. It's saved on the setup.
 5. Check the tool's **helix** and **stickout** under Operation. Fusion tools often lack them; values marked *assumed* are guesses (helix 35°, stickout 1.25 × flute length). Enter them once per tool. The **flute count** comes from the tool library, so make sure the tool is set up correctly there.
@@ -69,7 +69,9 @@ A gain below ×1 is shown in amber. It means the current cut is over your limits
 | Max slope | 2.5 N/° | Steepest rise in force per degree of rotation. It doesn't depend on rpm. Lower means gentler flute entry and less chatter. |
 | Max chip | **auto** | Max chip thickness h<sub>ex</sub>. Blank uses the material table below × tool Ø. |
 | Min chip | **auto** | Average chip h<sub>m</sub> below which the edge rubs. Blank uses the material table. |
-| Max spindle | 24,000 rpm | Under *More limits*, with max feed, max deflection, the cutting-speed window, helix if unknown, and spindle power. |
+| Max spindle | 24,000 rpm | Under *More limits*, with max feed, max deflection, the cutting-speed window, helix if unknown, spindle power and spindle torque. |
+| Spindle power | 2.2 kW | Under *More limits*; used when *Limit power* is ticked. Compared at the motor: cutting power ÷ efficiency. |
+| Max spindle torque | 0.89 N·m | Motor torque the spindle can deliver (cutting torque ÷ efficiency). A VFD spindle has constant torque up to rated speed, so this is the real ceiling whenever a cut runs below max rpm. Blank turns it off. |
 | Max feed | none | **Set this** to what your machine can really do. With thin stepovers the model allows very high feeds, and the panel warns you when that happens. |
 | Max deflection | none | Tool deflection at the peak force (see below). |
 | Finish deflection | 0.01 mm | Deflection limit for wall and floor finish passes (the tighter of this and Max deflection wins). |
@@ -111,6 +113,8 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 | Max chip | h<sub>ex</sub> = f<sub>z</sub>·sin φ for a<sub>e</sub> < D/2, else f<sub>z</sub> |
 | Specific force | k<sub>c</sub> = k<sub>c1</sub>·h<sub>m</sub><sup>−m<sub>c</sub></sup> |
 | Force curve | exact integral of k<sub>c</sub>·f<sub>z</sub>·sin θ along each helical flute, sampled every 0.1° |
+| Spindle power | P = a<sub>e</sub>·a<sub>p</sub>·v<sub>f</sub>·k<sub>c</sub> / (60·10⁶·η) kW, η = spindle efficiency |
+| Spindle torque | M = P·30·10³ / (π·n) N·m (at the motor) |
 | Deflection | δ = F<sub>peak</sub>·L³ / (3·E·I), I = π(0.8·D)⁴/64, E = 600 GPa (carbide), L = stickout |
 
 **The force graph** is the tangential force on the tool through one revolution, 0–360° left to right, 0 N at the bottom, a grid line every 90°. The blue line is the optimized cut, the grey line the current cut, and the amber dashed line your force limit. Nothing is filtered or smoothed. It is the exact integral rather than the older sliced approximation, which added sawtooth spikes. Light, deep cuts at a smooth depth look nearly flat; that's real, not smoothing.
@@ -120,7 +124,7 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 **The optimizer:**
 
 1. runs the spindle as fast as the rpm and cutting-speed limits allow;
-2. for each stepover × stepdown on a grid, computes one force curve and solves for the largest feed per tooth every limit allows (force, slope and power all scale exactly with f<sub>z</sub><sup>1−m<sub>c</sub></sup>);
+2. for each stepover × stepdown on a grid, computes one force curve and solves for the largest feed per tooth every limit allows (force, slope, power and torque all scale exactly with f<sub>z</sub><sup>1−m<sub>c</sub></sup>);
 3. refines around the best point and re-checks it on a 0.05° force curve;
 4. snaps the depth just under a whole multiple of the flute pitch πD/(z·tan β) when that's within 1% of the best. Force is nearly constant there, but only *just under*: go even 0.02 mm deeper and the full slope comes back.
 
@@ -138,7 +142,7 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 |---|---|
 | Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3), and the v0.5 panel shows a tool's flute count from the tool library. Reading a real 3D Adaptive roughing operation, and Apply on it in v0.4.1: spindle speed, feed and stepover were written, read back and the toolpath regenerated. That confirms `tool_spindleSpeed`, `tool_feedCutting` and `optimalLoad`. |
 | Verified by tests | The model and optimizer against the Sandvik and HSM reference cuts (15 Node tests). 42 Python tests against a fake Fusion API: reading operations, expanding setups, skipping unsupported operations, storing the material, limit profiles, and no crash with no document, no CAM data or nothing selected. For Apply, they also cover the write plan for each pass type, read-back checks, rollback when Fusion refuses a value or a parameter is locked, partial bulk applies, and Revert. The panel itself (pass defaults, finish engagement, the two-click Apply, the payload sent to Fusion, Revert, bulk) is driven by a fake Fusion bridge in headless Chrome. |
-| Not verified yet | Wall and floor finish passes (stock to leave), Revert, Apply on a pocket, contour or slot, and bulk Apply on several operations. |
+| Not verified yet | Wall and floor finish passes (stock to leave), Revert, Apply on a pocket, contour or slot, bulk Apply on several operations, and the v0.5.1 panel background fix (#6). |
 | Unverified names | The other CAM parameter names in `commands/optimizer/cam_mapping.py`: `maximumStepdown` (read, not yet written), `radialStockToLeave`, `axialStockToLeave`, `stockToLeave`, `tool_bodyLength`, …. A wrong name makes Apply refuse that operation with a message; it doesn't write somewhere else. |
 
 **Help verify the parameter names:** run the `djr_dump_cam_params` script from the release (Scripts tab → **+** → the unzipped folder → **Run**). Select an adaptive, a 2D contour (with stock to leave ticked), a 2D pocket and a slot first. Then commit its output to `docs/cam_params/`.

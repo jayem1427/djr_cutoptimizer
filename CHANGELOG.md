@@ -1,6 +1,10 @@
 # Changelog
 
-## v0.5.1 — 2026-11-24
+## v0.5.1 — 2026-11-25
+
+**Fixed: panel half light, half dark (#6).** On some systems, after Apply the lower part of the panel (Results, the force graph, Revert) lost its dark background, leaving light text on Fusion's light gray. Every part of the panel now paints its own background, and the panel repaints itself after Apply, Revert, a selection change, and when it's shown, focused or resized.
+
+**Fixed: version label.** The panel footer said v0.4.1. It now shows the add-in's version, and the release check fails if they disagree.
 
 **Spindle power and torque in Results.** The panel already calculated cutting power and torque but never showed them. Results now has *Spindle power* (at the motor: net ÷ efficiency, kW) and *Spindle torque* (N·m) for both the current and optimized cut. With *Limit power* on, a current cut over your spindle power gets ⚠.
 

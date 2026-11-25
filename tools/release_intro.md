@@ -8,4 +8,4 @@ Click an operation in the Manufacture browser, and a panel shows the current cut
 
 **No Fusion?** The same model runs in your browser: [online calculator](https://jayem1427.github.io/cutcalculator/).
 
-<sub>Renderings of the panel with a sample setup (a 1/4" 3-flute tool in 6061), not Fusion screenshots.</sub>
+<sub>Renderings of the panel with a sample setup (a 3/8" 3-flute tool in 6061), not Fusion screenshots.</sub>
