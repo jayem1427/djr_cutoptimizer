@@ -4,6 +4,8 @@ A Fusion add-in that picks **feeds, speeds, stepover and stepdown** for your CAM
 
 Click an operation in the Manufacture browser, and a compact panel shows the current cut next to the best one inside your limits. Shift-select several operations (or a whole setup), mark each as rough, wall finish or floor finish, and **Apply** writes the suggested feeds and speeds to all of them.
 
+**No Fusion?** The same model runs in your browser as a standalone calculator: **[jayem1427.github.io/cutcalculator](https://jayem1427.github.io/cutcalculator/)**. Enter a tool and a cut, set your limits, and press Optimize.
+
 > **Status: v0.5. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
 
 | One operation | All selected |
@@ -101,7 +103,7 @@ Only wrought aluminium k<sub>c1</sub> is calibrated (to Sandvik CoroPlus; cast a
 
 ## How it works
 
-The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_cutcalculator](https://github.com/jayem1427/cutcalculator) through `web/optimizer.js`.
+The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_cutcalculator](https://jayem1427.github.io/cutcalculator/) ([source](https://github.com/jayem1427/cutcalculator)) through `web/optimizer.js`.
 
 | Quantity | Formula |
 |---|---|
