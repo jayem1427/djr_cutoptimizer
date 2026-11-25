@@ -31,7 +31,7 @@ web/panel.html       the compact panel the palette opens (owned here). Holds the
 web/optimizer.js     the model (copied from cutcalculator; see above)
 docs/images/         README renderings of panel.html (headless Chrome, fake bridge, sample ops)
 scripts/djr_dump_cam_params/  Fusion script that dumps every op/tool parameter
-tools/               build_release.py, release_install.md, sync_web.py
+tools/               build_release.py, release_intro.md + release_install.md (release notes), sync_web.py
 tests/               test_addin.py (stdlib unittest with a fake adsk), web_optimizer.test.js (Node)
 ```
 
@@ -63,7 +63,7 @@ None of this replaces a real Fusion run. Be explicit about what was verified in 
 ## Releasing
 
 1. Bump `"version"` in `djr_cutoptimizer.manifest` **and** `PLUGIN_VERSION` in `config.py`.
-2. Add `## vX.Y.Z — date` to `CHANGELOG.md`. Its body becomes the release notes, followed by `tools/release_install.md`.
+2. Add `## vX.Y.Z — date` to `CHANGELOG.md`. The release notes are `tools/release_intro.md` (summary and screenshots pinned to the tag), then that body as "What's new", then `tools/release_install.md` (install and quick start).
 3. Push to `main`, then `git tag vX.Y.Z && git push origin vX.Y.Z`. `.github/workflows/release.yml` tests, builds `djr_cutoptimizer-vX.Y.Z.zip` and `djr_dump_cam_params-vX.Y.Z.zip`, and publishes the release. A tag that doesn't match the version fails on purpose.
 
 ## Next work (from the original handoff)
