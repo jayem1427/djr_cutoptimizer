@@ -93,6 +93,7 @@ input:disabled, select:disabled{ opacity:.55; }
 .btn.primary{ background:var(--primary); border-color:var(--primary); color:var(--primary-ink); font-weight:600; padding:0 18px; height:26px; }
 .btn.warn{ border-color:var(--warn); color:var(--warn); }
 .btn:disabled{ opacity:.45; cursor:default; }
+.btn.primary:disabled{ opacity:1; background:var(--field); border-color:var(--field-line); color:var(--muted); font-weight:400; }
 
 /* results table */
 table{ width:100%; border-collapse:collapse; }
@@ -760,10 +761,26 @@ function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne
    first arms the button for 4 s. Python checks every write and puts an op back on failure. */
 let applyArm = 0, busy = false;
 function flutesInDoubt(p){ return flutesFor(p).src === "missing"; }
-function applyTargets(){
+function optimizedOps(){
   const todo = mode === "one" ? (ops[idx] ? [ops[idx]] : []) : readable();
   return todo.filter(p => { const R = p.ok && results[opKey(p)]; return R && R.opt && R.opt.ok && !flutesInDoubt(p); });
 }
+/* Whether Apply would change anything: what it would write, rounded the way Python writes it,
+   against what Fusion holds now. After a successful Apply the ops are read again, so this
+   turns false and the button greys out until a limit or the selection changes. */
+function pending(p){
+  const it = applyItem(p), same = (a, b, tol) => isFinite(a) && isFinite(b) && Math.abs(a - b) <= tol;
+  if(!same(Math.floor(it.n), p.op.n, 0.5) || !same(Math.floor(it.vf), p.op.vf, 0.5)) return true;
+  const r4 = v => Math.round(v * 1e4) / 1e4;
+  if(it.ae !== undefined && !same(r4(it.ae), p.op.ae, 1e-3)) return true;
+  if(it.ap !== undefined && !same(r4(it.ap), p.op.ap, 1e-3)) return true;
+  if(it.pass !== "rough"){
+    const c = clearanceOf(readLimits()), want = it.pass === "wall" ? [0, c] : [c, 0], s = p.stock || {};
+    if(!same(want[0], s.radial, 1e-4) || !same(want[1], s.axial, 1e-4)) return true;
+  }
+  return false;
+}
+function applyTargets(){ return optimizedOps().filter(pending); }
 function applyItem(p){
   const b = results[opKey(p)].opt.best, ps = passFor(p), it = { id:opKey(p), n:b.n, vf:b.vf, pass:ps };
   if(ps === "rough"){
@@ -779,6 +796,7 @@ function renderApply(){
   btn.textContent = busy ? "Applying…" : applyArm ? `Confirm: write ${n} op${n === 1 ? "" : "s"}` : n > 1 ? `Apply to ${n} ops` : "Apply";
   const doubt = (mode === "one" ? (ops[idx] && ops[idx].ok ? [ops[idx]] : []) : readable()).filter(flutesInDoubt).length;
   btn.title = !FUSION ? "Open this panel in Fusion to apply" : doubt && !n ? "Enter the flute count first: the tool has none"
+    : !n && optimizedOps().length ? "Already applied: Fusion holds these values. Change a limit or the selection to apply again."
     : !n ? "Nothing optimized to apply yet"
     : "Write spindle speed and feed (and stock to leave for finish passes), then regenerate the toolpaths";
 }
