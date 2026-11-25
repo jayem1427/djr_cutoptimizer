@@ -142,7 +142,7 @@
   /* ---------- optimizer ---------- */
 
   const LIMIT_LABEL = {
-    force: "cutting force", slope: "force slope", feed: "feed rate", power: "spindle power",
+    force: "cutting force", slope: "force slope", feed: "feed rate", power: "spindle power", torque: "spindle torque",
     hexMax: "max chip thickness", hmMin: "min chip thickness", vc: "cutting speed", rpm: "spindle speed"
   };
 
@@ -196,7 +196,7 @@
 
   /**
    * Best feed per tooth at one (ae, ap): the largest fz every limit allows.
-   * Force, slope and power scale exactly with fz^(1−mc), so one force curve at a
+   * Force, slope, power and torque scale exactly with fz^(1−mc), so one force curve at a
    * reference feed is enough.
    */
   function evaluate(tool, L, n, ae, ap, stepDeg) {
@@ -215,10 +215,12 @@
       }
     }
     if (pos(L.vfmax)) caps.push(["feed", L.vfmax / (z * n)]);
-    if (pos(L.Pmax)) {
-      const Pc0 = ae * ap * FZ_REF * z * n * kc0 / 60e6;
-      const Pnet = L.Pmax * (pos(L.eta) ? L.eta : 1);
-      caps.push(["power", FZ_REF * Math.pow(Pnet / Pc0, e)]);
+    const Pc0 = ae * ap * FZ_REF * z * n * kc0 / 60e6, eta = pos(L.eta) ? L.eta : 1;
+    if (pos(L.Pmax)) caps.push(["power", FZ_REF * Math.pow(L.Pmax * eta / Pc0, e)]);
+    if (pos(L.Tmax)) {
+      // Motor torque = cutting torque / eta. Cutting torque Mc = Pc·30e3/(π·n); it doesn't depend on n.
+      const Mc0 = Pc0 * 30e3 / (Math.PI * n);
+      caps.push(["torque", FZ_REF * Math.pow(L.Tmax * eta / Mc0, e)]);
     }
     if (pos(L.hexMax)) caps.push(["hexMax", L.hexMax / hexK]);
     if (!caps.length) return { ae, ap, feasible: false, bind: "none", fz: NaN, Q: 0 };
@@ -253,7 +255,7 @@
    * Maximize removal rate Q over (n, fz, ae, ap).
    *
    * tool:   { D, z, helix, kc1, mc, rake, kappa, fluteLen }
-   * limits: { nmax, vfmax, Fmax, slopeMax, Pmax (motor kW), eta, hexMax, hmMin, vcMin, vcMax }
+   * limits: { nmax, vfmax, Fmax, slopeMax, Pmax (motor kW), Tmax (motor N·m), eta, hexMax, hmMin, vcMin, vcMax }
    * opts:   { aeLock, apLock, aeMin, aeMax, apMin, apMax, nAe, nAp, gridStep, refineStep, verifyStep }
    *
    * Returns { ok, reason?, n, vc, best, grid: { ae[], ap[], cells[i][j] }, pitch, smoothDepths, snapped }.
@@ -268,8 +270,8 @@
     if (straight && pos(L.slopeMax)) {
       return fail("Force slope is unbounded for a straight-flute tool (helix near 0°), so it can't be limited. Clear the slope limit or set the tool's helix angle.");
     }
-    if (![L.Fmax, L.slopeMax, L.vfmax, L.Pmax, L.hexMax].some(pos)) {
-      return fail("Set at least one limit on force, force slope, feed rate, power or chip thickness; otherwise the feed is unbounded.");
+    if (![L.Fmax, L.slopeMax, L.vfmax, L.Pmax, L.Tmax, L.hexMax].some(pos)) {
+      return fail("Set at least one limit on force, force slope, feed rate, power, torque or chip thickness; otherwise the feed is unbounded.");
     }
     const rpm = chooseRpm(tool, L);
     if (rpm.error) return fail(rpm.error);
@@ -372,6 +374,7 @@
     over("slope", isNum(r.robustSlope) ? r.robustSlope : r.maxSlope, L.slopeMax);
     over("feed", r.vf, L.vfmax);
     over("power", r.Pc / (pos(L.eta) ? L.eta : 1), L.Pmax);
+    over("torque", r.Mc / (pos(L.eta) ? L.eta : 1), L.Tmax);
     over("hexMax", r.hex, L.hexMax);
     over("rpm", n, L.nmax);
     over("vc", r.vc, L.vcMax);
@@ -381,7 +384,7 @@
   }
 
   return {
-    VERSION: "1.0.0",
+    VERSION: "1.1.0",
     STRAIGHT_FLUTE_DEG, LIMIT_LABEL,
     engagement, hmPerFz, hexPerFz, kcAt, flutePitch,
     AP_TOL, cutModel, forceCurve, forceStats, robustSlope, slopePerMs, slopeClosedForm,

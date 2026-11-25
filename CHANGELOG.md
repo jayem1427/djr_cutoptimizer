@@ -4,6 +4,8 @@
 
 **Spindle power and torque in Results.** The panel already calculated cutting power and torque but never showed them. Results now has *Spindle power* (at the motor: net ÷ efficiency, kW) and *Spindle torque* (N·m) for both the current and optimized cut. With *Limit power* on, a current cut over your spindle power gets ⚠.
 
+**Spindle torque limit.** New *Max spindle torque* field under More limits, defaulting to 0.89 N·m, the LemonTart spindle's rating. The optimizer never suggests a cut that needs more motor torque (cutting torque ÷ efficiency) than that, and a current cut over it gets ⚠. VFD spindles have constant torque up to their rated speed, so this is the real ceiling whenever a cut runs below max rpm. Shared model: optimizer.js 1.1.0.
+
 ## v0.5.0 — 2026-11-24
 
 **Native Fusion look.** The panel now looks like a Fusion command dialog, in the dark blue theme: collapsible Operation, Limits, Results and Force sections, label-on-the-left rows, square fields with units inside, a plain current-vs-optimized table, and a primary Apply button. The cards, pills, badges and meters are gone (#3).
