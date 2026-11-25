@@ -6,13 +6,13 @@ Click an operation in the Manufacture browser, and a compact panel shows the cur
 
 **No Fusion?** The same model runs in your browser as a standalone calculator: **[jayem1427.github.io/cutcalculator](https://jayem1427.github.io/cutcalculator/)**. Enter a tool and a cut, set your limits, and press Optimize.
 
-> **Status: v0.5. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
+> **Status: v0.5.2. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
 
 | One operation | All selected |
 |---|---|
 | ![The panel for one operation: operation, limits, current vs optimized, force curve](docs/images/panel-operation.png) | ![The bulk view: one row per operation with removal rate now, best, gain and limiting factor](docs/images/panel-bulk.png) |
 
-<sub>Renderings of the panel at Fusion's panel size, with a sample setup (a 1/4" 3-flute tool in 6061). They aren't Fusion screenshots.</sub>
+<sub>Renderings of the panel at Fusion's panel size, with a sample setup (a 3/8" 3-flute tool in 6061, limits for a 1.5 kW spindle). They aren't Fusion screenshots.</sub>
 
 ## Install
 
@@ -27,12 +27,12 @@ To upgrade, replace the folder, then **Stop** and **Run** the add-in (or restart
 ## Use
 
 1. In **Manufacture**, click **Optimize feeds & speeds** in the **Actions** panel. The panel opens on the right.
-2. Click an operation in the CAM browser. The **Operation** section at the top names what you're optimizing: tool number, operation, strategy, tool Ø, flutes, helix, stickout and setup. **Results** shows the current cut next to the best one inside your limits (feeds, speeds, removal rate, spindle power and torque at the motor, peak force, slope and deflection), with the removal-rate gain, and **Force over one revolution** graphs both. It re-optimizes whenever you click another operation or change a limit.
+2. Click an operation in the CAM browser. The **Operation** section at the top names what you're optimizing: tool number, operation, strategy, tool Ø, flutes, helix, stickout and setup. **Results** shows the current cut next to the best one inside your limits (feeds, speeds, removal rate, spindle power and torque at the motor, peak force, slope, deflection and, on roughing with a helical ramp, the helix ramp feed), with the removal-rate gain, and **Force over one revolution** graphs both. It re-optimizes whenever you click another operation or change a limit.
 3. **Bulk:** Shift- or Ctrl-click several operations, or click a whole setup, and open **All selected**. Each row shows the pass type, the removal rate now and the best, the gain, and what limits it. Operations the model doesn't cover say why. Click a row to open it.
 4. The first time for each setup, pick the stock **material** and click **Save to setup**. It's saved on the setup.
 5. Check the tool's **helix** and **stickout** under Operation. Fusion tools often lack them; values marked *assumed* are guesses (helix 35°, stickout 1.25 × flute length). Enter them once per tool. The **flute count** comes from the tool library, so make sure the tool is set up correctly there.
 6. Set each operation's **pass**: **Rough**, **Wall finish** or **Floor finish** (see below).
-7. Click **Apply** (or **Apply to N ops** in bulk), then click again within 4 s to confirm. Spindle speed and cutting feed are written and the toolpaths regenerate. **Revert** puts the last Apply back.
+7. Click **Apply** (or **Apply to N ops** in bulk), then click again within 4 s to confirm. Spindle speed and cutting feed are written and the toolpaths regenerate. Apply then greys out until there's something new to write: change a limit, the pass or the selection. **Revert** puts the last Apply back.
 
 Tools and geometry are still assigned by hand in Fusion; the add-in only sets feeds, speeds and finishing stock.
 
