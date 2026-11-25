@@ -224,6 +224,8 @@ canvas{ display:block; width:100%; height:128px; }
             <tr><td>Stepdown (a<sub>p</sub>)</td><td class="v num"><input id="c_ap" inputmode="decimal" aria-label="Current stepdown"></td><td class="v num best" id="o_ap">–</td><td class="u">mm</td></tr>
             <tr><td>Feed per tooth</td><td class="v num" id="c_fz">–</td><td class="v num best" id="o_fz">–</td><td class="u">mm</td></tr>
             <tr class="hero"><td>Removal rate</td><td class="v num" id="c_q">–</td><td class="v num best" id="o_q">–</td><td class="u">cm³/min <span class="gain" id="gain"></span></td></tr>
+            <tr><td title="At the motor: net cutting power ÷ efficiency">Spindle power</td><td class="v num" id="c_p">–</td><td class="v num best" id="o_p">–</td><td class="u">kW</td></tr>
+            <tr><td>Spindle torque</td><td class="v num" id="c_t">–</td><td class="v num best" id="o_t">–</td><td class="u">N·m</td></tr>
             <tr><td>Peak force</td><td class="v num" id="c_f">–</td><td class="v num best" id="o_f">–</td><td class="u">N<span class="bar"><i id="b_f"></i></span></td></tr>
             <tr><td>Force slope</td><td class="v num" id="c_s">–</td><td class="v num best" id="o_s">–</td><td class="u">N/deg<span class="bar"><i id="b_s"></i></span></td></tr>
             <tr><td>Deflection</td><td class="v num" id="c_d">–</td><td class="v num best" id="o_d">–</td><td class="u">mm<span class="bar"><i id="b_d"></i></span></td></tr>
@@ -651,9 +653,10 @@ function renderChipAuto(){
 function setCell(id, v, s){ $(id).textContent = typeof v === "string" ? v : g(v, s); }
 function renderOne(){
   const p = ops[idx], L = readLimits();
-  const ids = ["c_n","c_vf","c_fz","c_q","c_f","c_s","c_d","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_f","o_s","o_d"];
+  const ids = ["c_n","c_vf","c_fz","c_q","c_p","c_t","c_f","c_s","c_d","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_p","o_t","o_f","o_s","o_d"];
   ids.forEach(i => $(i).textContent = "–"); $("gain").textContent = "";
-  ["c_f","c_s","c_d"].forEach(i => { $(i).classList.remove("over"); $(i).title = ""; }); $("verdict").textContent = "";
+  ["c_p","c_f","c_s","c_d"].forEach(i => { $(i).classList.remove("over"); $(i).title = ""; });
+  const eta = L.eta > 0 && L.eta <= 1 ? L.eta : 1, kw = r => r && isFinite(r.Pc) ? r.Pc / eta : NaN; $("verdict").textContent = "";
   $("b_f").style.width = "0"; $("b_s").style.width = "0"; $("b_d").style.width = "0";
   if(!p || !p.ok){ $("c_ae").value = ""; $("c_ap").value = ""; drawCurve(null, null, L); return; }
   const geo = currentGeom(p);
@@ -662,14 +665,14 @@ function renderOne(){
   const R = results[opKey(p)] || {}, cur = R.cur, opt = R.opt;
   if(cur){
     setCell("c_n", f(cur.n,0)); setCell("c_vf", f(cur.vf,0)); setCell("c_fz", cur.fz, 3);
-    setCell("c_q", cur.Q, 3); setCell("c_f", cur.peak, 3); setCell("c_s", cur.robustSlope, 3); setCell("c_d", cur.defl, 2);
+    setCell("c_q", cur.Q, 3); setCell("c_p", kw(cur), 2); setCell("c_t", cur.Mc, 2); setCell("c_f", cur.peak, 3); setCell("c_s", cur.robustSlope, 3); setCell("c_d", cur.defl, 2);
   } else {
     setCell("c_n", p.op.n > 0 ? f(p.op.n,0) : "–"); setCell("c_vf", p.op.vf > 0 ? f(p.op.vf,0) : "–");
   }
   if(opt && opt.ok){
     const b = opt.best;
     setCell("o_n", f(b.n,0)); setCell("o_vf", f(b.vf,0)); setCell("o_ae", b.ae, 3); setCell("o_ap", b.ap, 3);
-    setCell("o_fz", b.fz, 3); setCell("o_q", b.Q, 3); setCell("o_f", b.peak, 3); setCell("o_s", b.robustSlope, 3); setCell("o_d", b.defl, 2);
+    setCell("o_fz", b.fz, 3); setCell("o_q", b.Q, 3); setCell("o_p", kw(b), 2); setCell("o_t", b.Mc, 2); setCell("o_f", b.peak, 3); setCell("o_s", b.robustSlope, 3); setCell("o_d", b.defl, 2);
     const Lo = effLimits(p, L), dl = deflLimit(p, L);
     if(L.Fmax) $("b_f").style.width = Math.min(100, b.peak / L.Fmax * 100) + "%";
     if(dl) $("b_d").style.width = Math.min(100, b.defl / dl * 100) + "%";
@@ -686,6 +689,7 @@ function renderOne(){
     if(cur){
       const over = CutOpt.checkLimits(cur, Lo, cur.n).map(x => limitName(x.limit, Lo));
       const mark = (id, bad, what) => { if(bad){ $(id).classList.add("over"); $(id).title = `Over your ${what} limit`; } };
+      mark("c_p", L.usePow && L.pmax > 0 && kw(cur) > L.pmax * 1.005, "spindle power");
       mark("c_f", L.Fmax > 0 && cur.peak > L.Fmax * 1.005, "force");
       mark("c_s", L.slopeMax > 0 && cur.robustSlope > L.slopeMax * 1.005, "force slope");
       mark("c_d", dl > 0 && cur.defl > dl * 1.005, "deflection");

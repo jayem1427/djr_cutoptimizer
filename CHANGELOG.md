@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.5.1 — 2026-11-24
+
+**Spindle power and torque in Results.** The panel already calculated cutting power and torque but never showed them. Results now has *Spindle power* (at the motor: net ÷ efficiency, kW) and *Spindle torque* (N·m) for both the current and optimized cut. With *Limit power* on, a current cut over your spindle power gets ⚠.
+
 ## v0.5.0 — 2026-11-24
 
 **Native Fusion look.** The panel now looks like a Fusion command dialog, in the dark blue theme: collapsible Operation, Limits, Results and Force sections, label-on-the-left rows, square fields with units inside, a plain current-vs-optimized table, and a primary Apply button. The cards, pills, badges and meters are gone (#3).
