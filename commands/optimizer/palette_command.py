@@ -379,7 +379,7 @@ class OptimizerCommand:
                     continue
                 try:
                     plan = cam_mapping.plan_writes(payload['src'], it, clearance, payload.get('stockSrc'),
-                                                   payload['op'].get('aeMax'))
+                                                   payload['op'].get('aeMax'), payload.get('rampSrc'))
                 except ValueError as e:
                     res['reason'] = str(e)
                     continue

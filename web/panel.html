@@ -235,6 +235,7 @@ canvas{ display:block; width:100%; height:128px; }
             <tr><td>Peak force</td><td class="v num" id="c_f">–</td><td class="v num best" id="o_f">–</td><td class="u">N<span class="bar"><i id="b_f"></i></span></td></tr>
             <tr><td>Force slope</td><td class="v num" id="c_s">–</td><td class="v num best" id="o_s">–</td><td class="u">N/deg<span class="bar"><i id="b_s"></i></span></td></tr>
             <tr><td>Deflection</td><td class="v num" id="c_d">–</td><td class="v num best" id="o_d">–</td><td class="u">mm<span class="bar"><i id="b_d"></i></span></td></tr>
+            <tr id="rampRow" class="hidden"><td title="Feed along the helical ramp (entry). Modelled as a full-width slot as deep as one turn of the helix descends, inside the same limits.">Helix ramp feed</td><td class="v num" id="c_rf">–</td><td class="v num best" id="o_rf">–</td><td class="u">mm/min</td></tr>
           </tbody>
         </table>
         <p class="verdict" id="verdict"></p>
@@ -513,6 +514,35 @@ function currentCut(p, L){
   return c;
 }
 
+/* Helical ramp (entry). Fusion feeds the ramp at its own feed and spindle speed, often a slow
+   tool-library default. Each turn of the helix descends pitch = π·Dh·tan(angle); the tool cuts
+   full width, so it's modelled as a slot that deep, inside the same limits, at the cut's rpm.
+   The ramp feed is the tool centre's: on a circle of diameter Dh the outer wall (Dh + D) moves
+   faster, so the edge feed the model allows is scaled by Dh / (Dh + D). Never above the cutting feed.
+   Fusion's 2° and a helix as wide as the tool are assumed when the operation doesn't say. */
+const RAMP_ANGLE_DEFAULT = 2;
+function rampGeom(p){
+  const r = p.ramp || {}, D = p.tool.D;
+  const angle = r.angle > 0 && r.angle < 45 ? r.angle : null, dia = r.dia > 0 ? r.dia : null;
+  return { angle: angle || RAMP_ANGLE_DEFAULT, dia: dia || D, assumedAngle: !angle, assumedDia: !dia };
+}
+function rampCut(p, L, best){
+  if(!p.ramp || !p.rampSrc || !p.rampSrc.vf || isFinish(p) || p.kind === "slot" || !best) return null;
+  const type = String(p.ramp.type || "").toLowerCase();
+  if(type && !/heli/.test(type)) return { skip: `the ramp type is “${p.ramp.type}”; only helical ramps are modelled` };
+  const t = toolOf(p, L), gm = rampGeom(p);
+  const pitch = Math.PI * gm.dia * Math.tan(gm.angle * Math.PI / 180);
+  const Lo = Object.assign({}, effLimits(p, L), { nmax: best.n });
+  let r;
+  try{ r = CutOpt.optimize(t, Lo, { aeLock: t.D, apLock: Math.max(pitch, 0.01) }); }
+  catch(e){ return { skip: "the ramp couldn’t be optimized" }; }
+  if(!r.ok) return { skip: r.reason };
+  const k = gm.dia / (gm.dia + t.D), vfEdge = r.best.vf;
+  const capped = vfEdge * k > best.vf;
+  return { vf: Math.min(vfEdge * k, best.vf), n: best.n, edge: r.best, pitch, gm, k,
+    bindLabel: capped ? "the cutting feed" : limitName(r.best.bind, Lo) };
+}
+
 function optimizeOp(p, L, bulk){
   const t = toolOf(p, L), { ae, ap } = currentGeom(p);
   const k = keeps(p), fin = isFinish(p);
@@ -671,6 +701,9 @@ function renderOne(){
   const ids = ["c_n","c_vf","c_fz","c_q","c_p","c_t","c_f","c_s","c_d","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_p","o_t","o_f","o_s","o_d"];
   ids.forEach(i => $(i).textContent = "–"); $("gain").textContent = "";
   ["c_p","c_t","c_f","c_s","c_d"].forEach(i => { $(i).classList.remove("over"); $(i).title = ""; });
+  $("c_rf").textContent = "–"; $("o_rf").textContent = "–";
+  $("rampRow").classList.toggle("hidden", !(p && p.ok && p.rampSrc && p.rampSrc.vf && !isFinish(p) && p.kind !== "slot"));
+  if(p && p.ok && p.ramp && p.ramp.vf > 0) setCell("c_rf", f(p.ramp.vf, 0));
   const eta = L.eta > 0 && L.eta <= 1 ? L.eta : 1, kw = r => r && isFinite(r.Pc) ? r.Pc / eta : NaN; $("verdict").textContent = "";
   $("b_f").style.width = "0"; $("b_s").style.width = "0"; $("b_d").style.width = "0";
   if(!p || !p.ok){ $("c_ae").value = ""; $("c_ap").value = ""; drawCurve(null, null, L); return; }
@@ -712,6 +745,13 @@ function renderOne(){
       if(over.length) v += ` The current cut is over your ${[...new Set(over)].join(", ")} limit.`;
     } else v += " Couldn’t read the current cut fully, so there’s nothing to compare.";
     if(!(L.vfmax > 0) && b.ae <= 0.021 * p.tool.D) v += ` Stepover is at its 2% floor with a ${f(b.vf,0)} mm/min feed: set <b>Max feed</b> (More limits) to what your machine can really do.`;
+    const rp = R.ramp;
+    if(rp && rp.vf > 0){
+      setCell("o_rf", f(rp.vf, 0));
+      const as = [rp.gm.assumedAngle && `${g(rp.gm.angle,2)}°`, rp.gm.assumedDia && `Ø ${g(rp.gm.dia,3)} mm`].filter(Boolean);
+      v += ` Helix ramp: ${g(rp.gm.angle,2)}° on Ø ${g(rp.gm.dia,3)} mm descends ${g(rp.pitch,2)} mm a turn, fed as a slot that deep; limited by <b>${esc(rp.bindLabel)}</b>.`;
+      if(as.length) v += ` (${as.join(" and ")} assumed: the operation didn’t say.)`;
+    } else if(rp && rp.skip) v += ` Ramp feed left alone: ${esc(rp.skip)}.`;
     if(helixFor(p, L).assumed && L.slopeMax) v += " Helix is assumed; check it for the slope limit.";
     if(stickoutFor(p).assumed && dl) v += " Stickout is assumed; check it for the deflection limit.";
     $("verdict").innerHTML = v;
@@ -774,6 +814,9 @@ function pending(p){
   const r4 = v => Math.round(v * 1e4) / 1e4;
   if(it.ae !== undefined && !same(r4(it.ae), p.op.ae, 1e-3)) return true;
   if(it.ap !== undefined && !same(r4(it.ap), p.op.ap, 1e-3)) return true;
+  const rr = p.ramp || {};
+  if(it.rampVf !== undefined && !same(Math.floor(it.rampVf), rr.vf, 0.5)) return true;
+  if(it.rampN !== undefined && !same(Math.floor(it.rampN), rr.n, 0.5)) return true;
   if(it.pass !== "rough"){
     const c = clearanceOf(readLimits()), want = it.pass === "wall" ? [0, c] : [c, 0], s = p.stock || {};
     if(!same(want[0], s.radial, 1e-4) || !same(want[1], s.axial, 1e-4)) return true;
@@ -783,6 +826,8 @@ function pending(p){
 function applyTargets(){ return optimizedOps().filter(pending); }
 function applyItem(p){
   const b = results[opKey(p)].opt.best, ps = passFor(p), it = { id:opKey(p), n:b.n, vf:b.vf, pass:ps };
+  const rp = results[opKey(p)].ramp;
+  if(ps === "rough" && rp && rp.vf > 0){ it.rampVf = rp.vf; if(p.rampSrc && p.rampSrc.n) it.rampN = rp.n; }
   if(ps === "rough"){
     const k = keeps(p), o = geomOverride(p);
     if(p.kind !== "slot"){ if(!k.ae) it.ae = b.ae; else if(isFinite(o.ae)) it.ae = o.ae; }
@@ -798,7 +843,7 @@ function renderApply(){
   btn.title = !FUSION ? "Open this panel in Fusion to apply" : doubt && !n ? "Enter the flute count first: the tool has none"
     : !n && optimizedOps().length ? "Already applied: Fusion holds these values. Change a limit or the selection to apply again."
     : !n ? "Nothing optimized to apply yet"
-    : "Write spindle speed and feed (and stock to leave for finish passes), then regenerate the toolpaths";
+    : "Write spindle speed and feed, the helix ramp feed on roughing (and stock to leave on finish passes), then regenerate the toolpaths";
 }
 function onApply(){
   const t = applyTargets();
@@ -894,7 +939,10 @@ function run(){
     if(token !== runToken) return;                       // superseded by a newer run
     if(i >= todo.length){ render(); return; }
     const p = todo[i++], k = opKey(p);
-    if(!results[k]) results[k] = { cur: currentCut(p, L), opt: optimizeOp(p, L, mode === "all") };
+    if(!results[k]){
+      const opt = optimizeOp(p, L, mode === "all");
+      results[k] = { cur: currentCut(p, L), opt, ramp: opt.ok ? rampCut(p, L, opt.best) : null };
+    }
     render();
     setTimeout(step, 0);                                  // keep the panel responsive
   };
