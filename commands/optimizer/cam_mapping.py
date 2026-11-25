@@ -37,6 +37,13 @@ STOCK_NAMES = {
     'radial': ['radialStockToLeave'],
     'axial':  ['axialStockToLeave'],
 }
+# Adaptive clearing: Fusion refuses to generate when optimal load + load deviation is over
+# 99 % of the tool diameter. The deviation can be a fixed length or an expression of the
+# optimal load (e.g. "optimalLoad * 0.1"). Name unverified, like the others.
+LOAD_DEV_NAMES = ['loadDeviation']
+MAX_LOAD_FRACTION = 0.99
+# Used when the deviation can't be read: assume 20 % of the diameter, so the cap is 0.79 D.
+FALLBACK_DEV_FRACTION = 0.20
 # The "Stock to leave" checkbox that enables the two values (a boolean parameter).
 STOCK_FLAG = ['stockToLeave', 'doStockToLeave', 'useStockToLeave']
 PASSES = ('rough', 'wall', 'floor')
@@ -204,6 +211,8 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
     src = {k: found_name(op_params, OP_NAMES[k], KIND[k]) for k in ('n', 'vf', 'ae', 'ap')}
     if kind_or_reason == 'slot':
         src['ae'] = None                 # a slot's width is the tool; nothing to write
+    if src.get('ae') == 'optimalLoad':
+        op['aeMax'] = max_optimal_load(op_params, tool['D'], op.get('ae'))
     stock = {k: read_value(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
     stock_src = {k: found_name(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
     stock_src['flag'] = next((n for n in STOCK_FLAG if n in op_params and isinstance(op_params[n][1], bool)), None)
@@ -211,6 +220,29 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
             'toolNumber': card['number'], 'toolDesc': card['description'],
             'tool': tool, 'op': op, 'material': material, 'missing': missing,
             'src': src, 'stock': stock, 'stockSrc': stock_src}
+
+
+def max_optimal_load(op_params: dict, D: Optional[float], ae_now: Optional[float]) -> Optional[float]:
+    """The largest optimal load Fusion will generate: load + deviation <= 99 % of D.
+
+    None when the operation has no optimal load (not an adaptive). A deviation written as an
+    expression of the optimal load scales with it, so the cap is 0.99 D / (1 + ratio);
+    a fixed deviation gives 0.99 D - deviation. Rounded down to 0.001 mm.
+    """
+    if 'optimalLoad' not in op_params or not D or D <= 0:
+        return None
+    top = MAX_LOAD_FRACTION * D
+    name = next((n for n in LOAD_DEV_NAMES if n in op_params), None)
+    dev = read_value(op_params, [name], 'len') if name else None
+    expr = str(op_params[name][0]) if name else ''
+    if dev is None or dev < 0:
+        cap = top - FALLBACK_DEV_FRACTION * D
+    elif 'optimalLoad' in expr and ae_now and ae_now > 0:
+        cap = top / (1 + dev / ae_now)
+    else:
+        cap = top - dev
+    cap = math.floor(cap * 1000 + 1e-6) / 1000
+    return cap if cap > 0 else None
 
 
 def found_name(params: dict, names: list, kind: str) -> Optional[str]:
@@ -233,11 +265,12 @@ def _fmt(v: float) -> str:
     return f'{round(v, 4):g}'
 
 
-def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dict] = None) -> list:
+def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dict] = None,
+                ae_max: Optional[float] = None) -> list:
     """The parameter writes for one operation: [(name, expression, kind, target)].
 
     item: {n, vf, pass, ae?, ap?} from the panel (rpm, mm/min, mm). ae/ap are written only
-    when given. Finishing passes also set stock to leave: a wall finish leaves `clearance`
+    when given; ae_max caps an adaptive's optimal load (see max_optimal_load). Finishing passes also set stock to leave: a wall finish leaves `clearance`
     on the floor (axial) and none on the wall; a floor finish the other way round.
     Raises ValueError when something needed is missing, so the op is skipped as a whole:
     half-applied feeds and speeds are worse than none.
@@ -259,6 +292,10 @@ def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dic
         if not src.get(k):
             raise ValueError(f'Couldn’t find this operation’s {label} parameter, so the optimized '
                              f'{label} can’t be written. Tick Keep {label} and apply again.')
+        if k == 'ae' and ae_max and v > ae_max + 1e-6:
+            raise ValueError(f'Optimal load {_fmt(v)} mm plus the load deviation would be over 99 % of the '
+                             f'tool diameter, which Fusion refuses. The most this operation allows is '
+                             f'{_fmt(ae_max)} mm. Reselect it so the panel picks that up, or tick Keep stepover.')
         writes.append((src[k], f'{_fmt(v)} mm', 'len', round(v, 4)))
 
     p = item.get('pass') or 'rough'

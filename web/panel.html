@@ -302,7 +302,7 @@ const MATERIALS = {
 };
 const E_CARBIDE = 600000;   // N/mm², solid carbide (same as the calculator)
 const DEFAULT_MAT = "Aluminium (wrought)";
-const VERSION = "0.5.1";
+const VERSION = "0.5.2";
 const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","tmax","eta","deflFinish","clearance"];
 const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", hmMin:"", nmax:24000, vfmax:"", deflMax:"", vcMin:"", vcMax:"", helixDefault:35, pmax:2.2, tmax:0.89, eta:0.85,
   deflFinish:0.01, clearance:0.05 };
@@ -514,6 +514,8 @@ function optimizeOp(p, L, bulk){
   const t = toolOf(p, L), { ae, ap } = currentGeom(p);
   const k = keeps(p), fin = isFinish(p);
   const opts = { apMax: t.fluteLen || undefined };
+  /* Adaptive: Fusion won't generate when optimal load + load deviation is over 99 % of D. */
+  if(p.op.aeMax > 0) opts.aeMax = Math.min(p.op.aeMax, t.D);
   if(k.ae){ if(!(ae > 0)) return { ok:false, reason: fin ? "Finish stepover unknown. Enter it under Current (the stock left on the wall)." : "Stepover unknown. Enter it under Current, or untick Keep stepover." }; opts.aeLock = Math.min(ae, t.D); }
   if(k.ap){ if(!(ap > 0)) return { ok:false, reason: fin ? "Finish stepdown unknown. Enter it under Current." : "Stepdown unknown. Enter it under Current, or untick Keep stepdown." }; opts.apLock = ap; }
   if(bulk){ opts.nAe = 20; opts.nAp = 20; }

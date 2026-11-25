@@ -378,7 +378,8 @@ class OptimizerCommand:
                     res['reason'] = payload.get('reason', 'Couldn’t read the operation.')
                     continue
                 try:
-                    plan = cam_mapping.plan_writes(payload['src'], it, clearance, payload.get('stockSrc'))
+                    plan = cam_mapping.plan_writes(payload['src'], it, clearance, payload.get('stockSrc'),
+                                                   payload['op'].get('aeMax'))
                 except ValueError as e:
                     res['reason'] = str(e)
                     continue
