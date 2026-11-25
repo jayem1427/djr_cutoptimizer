@@ -8,6 +8,8 @@ If an operation already shows the error, use **Revert** (in the same Fusion sess
 
 **Max stepover.** New limit under More limits, 40% of the tool diameter by default. The optimizer used to search all the way to a full-width cut, and with generous force and slope limits it picked one, which isn't how anyone runs an adaptive. It doesn't apply to a stepover you keep, or to slots.
 
+**Apply greys out once it's done.** After a successful Apply the panel reads the operations back, and Apply stays disabled (grey, not faded blue) while Fusion already holds exactly what it would write. Change a limit, the pass or the selection and it lights up again. Revert stays available.
+
 **Spindle defaults** now match a 1.5 kW, 24,000 rpm constant-torque spindle (Jianken JGD-80/1.5R24): 1.5 kW, 0.6 N·m, efficiency 0.8. The old 0.89 N·m was the torque of a 2.2 kW spindle. Saved working limits and profiles keep their own values, so check yours under More limits.
 
 ## v0.5.1 — 2026-11-25
