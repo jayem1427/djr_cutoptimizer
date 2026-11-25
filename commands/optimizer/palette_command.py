@@ -238,7 +238,8 @@ class OptimizerCommand:
             strategy,
             cam_mapping.params_to_dict(op.parameters),
             cam_mapping.params_to_dict(tool.parameters),
-            op_name=name, material=material)
+            op_name=name, material=material,
+            tool_json=_safe(lambda: tool.toJson()))
         payload['setup'] = setup_name
         payload['id'] = _op_id(setup_name, name)
         cls._ops[payload['id']] = op
