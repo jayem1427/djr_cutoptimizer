@@ -69,9 +69,10 @@ A gain below ×1 is shown in amber. It means the current cut is over your limits
 | Max slope | 2.5 N/° | Steepest rise in force per degree of rotation. It doesn't depend on rpm. Lower means gentler flute entry and less chatter. |
 | Max chip | **auto** | Max chip thickness h<sub>ex</sub>. Blank uses the material table below × tool Ø. |
 | Min chip | **auto** | Average chip h<sub>m</sub> below which the edge rubs. Blank uses the material table. |
-| Max spindle | 24,000 rpm | Under *More limits*, with max feed, max deflection, the cutting-speed window, helix if unknown, spindle power and spindle torque. |
-| Spindle power | 2.2 kW | Under *More limits*; used when *Limit power* is ticked. Compared at the motor: cutting power ÷ efficiency. |
-| Max spindle torque | 0.89 N·m | Motor torque the spindle can deliver (cutting torque ÷ efficiency). A VFD spindle has constant torque up to rated speed, so this is the real ceiling whenever a cut runs below max rpm. Blank turns it off. |
+| Max spindle | 24,000 rpm | Under *More limits*, with max stepover, max feed, max deflection, the cutting-speed window, helix if unknown, spindle power and spindle torque. |
+| Max stepover | 40% of Ø | Under *More limits*. The largest stepover the optimizer may choose; it doesn't touch a stepover you keep, or slots. On adaptives it also stays under Fusion's own cap (optimal load + load deviation ≤ 99% of Ø). Without it, generous force limits let the optimizer pick near full-width cuts. |
+| Spindle power | 1.5 kW | Under *More limits*; used when *Limit power* is ticked. Compared at the motor: cutting power ÷ efficiency (default 0.8). Leave margin: about 1.3 kW for a 1.5 kW spindle. |
+| Max spindle torque | 0.6 N·m | Motor torque the spindle can deliver (cutting torque ÷ efficiency). A VFD spindle has constant torque up to rated speed, so this is the real ceiling whenever a cut runs below max rpm. Blank turns it off. |
 | Max feed | none | **Set this** to what your machine can really do. With thin stepovers the model allows very high feeds, and the panel warns you when that happens. |
 | Max deflection | none | Tool deflection at the peak force (see below). |
 | Finish deflection | 0.01 mm | Deflection limit for wall and floor finish passes (the tighter of this and Max deflection wins). |
