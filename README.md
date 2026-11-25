@@ -28,7 +28,7 @@ To upgrade, replace the folder, then **Stop** and **Run** the add-in (or restart
 2. Click an operation in the CAM browser. The **card** at the top names what you're optimizing: tool number, operation, strategy, tool Ø, flutes, helix, stickout and setup. Below it is the current cut next to the best one inside your limits, with the removal-rate gain. It re-optimizes whenever you click another operation or change a limit.
 3. **Bulk:** Shift- or Ctrl-click several operations, or click a whole setup, and open **All selected**. Each row shows the pass type, the removal rate now and the best, the gain, and what limits it. Operations the model doesn't cover say why. Click a row to open it.
 4. The first time for each setup, pick the stock **material** and press **Confirm**. It's saved on the setup.
-5. Check the tool's **helix** and **stickout** on the card. Fusion tools often lack them; values marked *assumed* are guesses (helix 35°, stickout 1.25 × flute length). Enter them once per tool.
+5. Check the tool's **helix** and **stickout** on the card. Fusion tools often lack them; values marked *assumed* are guesses (helix 35°, stickout 1.25 × flute length). Enter them once per tool. The **flute count** comes from the tool library, so make sure the tool is set up correctly there.
 6. Set each operation's **pass**: **Rough**, **Wall finish** or **Floor finish** (see below).
 7. Click **Apply** (or **Apply to N ops** in bulk), then click again within 4 s to confirm. Spindle speed and cutting feed are written and the toolpaths regenerate. **Revert** puts the last Apply back.
 

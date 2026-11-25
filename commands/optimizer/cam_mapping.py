@@ -9,6 +9,7 @@ a slot, commit the output to docs/cam_params/, then fix these tables to match.
 """
 from __future__ import annotations
 
+import json
 import math
 import re
 from typing import Optional
@@ -24,7 +25,7 @@ OP_NAMES = {
 }
 TOOL_NAMES = {
     'D':        ['tool_diameter'],
-    'z':        ['tool_numberOfFlutes'],
+    'z':        ['tool_numberOfFlutes', 'tool_fluteCount', 'tool_flutes'],
     'fluteLen': ['tool_fluteLength'],
     'stickout': ['tool_bodyLength', 'tool_shoulderLength', 'tool_overallLength'],
     'helix':    ['tool_helixAngle'],
@@ -159,8 +160,18 @@ def strategy_status(strategy: str) -> tuple[bool, str]:
     return False, f'The “{strategy}” strategy isn’t one the model covers (it covers adaptive, contour, pocket, slot and face).'
 
 
+def flutes_from_json(tool_json: Optional[str]) -> Optional[int]:
+    """The flute count from Tool.toJson() (the tool library's own record: geometry.NOF)."""
+    try:
+        z = json.loads(tool_json)['geometry']['NOF']
+        z = int(round(float(z)))
+    except Exception:
+        return None
+    return z if 1 <= z <= 16 else None
+
+
 def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: str = '',
-                  material: Optional[str] = None) -> dict:
+                  material: Optional[str] = None, tool_json: Optional[str] = None) -> dict:
     """Everything the palette needs to fill in the calculator, or a reason it can't."""
     ok, kind_or_reason = strategy_status(strategy)
     label = strategy_label(strategy)
@@ -172,8 +183,11 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
     tool = {k: read_value(tool_params, names, KIND.get(k, 'len')) for k, names in TOOL_NAMES.items() if k != 'type'}
     op = {k: read_value(op_params, names, KIND[k]) for k, names in OP_NAMES.items()}
 
-    if tool.get('z') is not None:
-        tool['z'] = int(round(tool['z']))
+    # The tool library's own record first, then the tool's parameters.
+    z = flutes_from_json(tool_json)
+    if z is None and tool.get('z') is not None and tool['z'] >= 1:
+        z = int(round(tool['z']))
+    tool['z'] = z
     if not tool.get('D') or tool['D'] <= 0:
         return {'ok': False, 'reason': 'Couldn’t read the tool diameter from this operation’s tool.',
                 'operation': op_name, 'strategy': strategy}

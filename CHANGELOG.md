@@ -4,7 +4,7 @@
 
 **Native Fusion look.** The panel now looks like a Fusion command dialog, in the dark blue theme: collapsible Operation, Limits, Results and Force sections, label-on-the-left rows, square fields with units inside, a plain current-vs-optimized table, and a primary Apply button. The cards, pills, badges and meters are gone (#3).
 
-**Flute count you can trust (#1).** The flute count is now an editable field on the operation. If the tool library and the tool's description disagree ("3 FLUTE" vs 1 in the library), the panel warns you and Apply stays disabled until you type the right number. A missing flute count no longer silently becomes 2.
+**Flute count (#1).** The flute count is read from the tool library's own record (`Tool.toJson()`), then from the tool's parameters, and shown as an editable field on the operation. The library is trusted: if it's wrong, fix the tool in Fusion's Tool Library (issue #1 turned out to be a tool entered as 1 flute). A missing flute count no longer silently becomes 2; Apply skips that op until you enter one.
 
 **Force graph.** It has axes in newtons and degrees, a grid every 90°, current and optimized lines, and the force limit as a dashed line. The fill is gone. Current values over a limit are marked with ⚠ in the table.
 

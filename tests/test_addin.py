@@ -232,6 +232,20 @@ class BuildPayload(unittest.TestCase):
         self.assertAlmostEqual(p['op']['fz'], 6278 / (24000 * 4), places=6)
         self.assertEqual(p['missing'], [])
 
+    def _flutes(self, tool_json=None):
+        rows = [('tool_diameter', '9.525 mm', 0.9525), ('tool_numberOfFlutes', '1', 1),
+                ('tool_description', "'3 FLUTE 3/8\" FLAT'", '')]
+        op = _fake_op(tool_rows=rows)
+        return cam_mapping.build_payload('adaptive', cam_mapping.params_to_dict(op.parameters),
+                                         cam_mapping.params_to_dict(op.tool.parameters), 'R2', tool_json=tool_json)['tool']['z']
+
+    def test_flutes_trust_library_not_description(self):
+        self.assertEqual(self._flutes(), 1)
+
+    def test_flutes_from_tool_json_first(self):
+        self.assertEqual(self._flutes('{"geometry": {"NOF": 3}}'), 3)
+        self.assertEqual(self._flutes('not json'), 1)
+
     def test_slot_is_full_width(self):
         op = _fake_op()
         p = cam_mapping.build_payload('slot', cam_mapping.params_to_dict(op.parameters),

@@ -434,15 +434,11 @@ function materialFor(p){
   const m = materialChoice || p.material;
   return MATERIALS[m] ? m : DEFAULT_MAT;
 }
-/* Flute count: an override typed on the card wins (issue #1: a library can say 1 flute on a
-   3-flute tool). flutesHint reads "3 FLUTE", "3FL", "3 FLT" from the tool's description. */
-function flutesHint(p){ const m = /(\d+)\s*-?\s*(?:FLUTES?|FLT|FL)\b/i.exec(p.toolDesc || ""); return m ? +m[1] : null; }
+/* Flute count: from the tool library, unless one is typed on the card. */
 function flutesFor(p){
   const o = overrides["z:" + toolKey(p)];
   if(isFinite(o) && o >= 1) return { z:o, src:"typed" };
-  if(p.tool && p.tool.z >= 1) return { z:p.tool.z, src:"library" };
-  const h = flutesHint(p);
-  return h ? { z:h, src:"description" } : { z:null, src:"missing" };
+  return p.tool && p.tool.z >= 1 ? { z:p.tool.z, src:"library" } : { z:null, src:"missing" };
 }
 function toolOf(p, L){
   const { kc1, mc } = MATERIALS[materialFor(p)];
@@ -615,11 +611,8 @@ function renderCard(){
   $("opname").textContent = p.operation;
   $("opname").title = `${p.operation} — ${p.setup}`;
   if(!p.ok){ $("opmeta").innerHTML = `${esc(p.strategyLabel || p.strategy)} · Setup <b>${esc(p.setup)}</b> · <span class="assumed">${esc(p.reason)}</span>`; return; }
-  const L = readLimits(), h = helixFor(p, L), so = stickoutFor(p), fl = flutesFor(p), hint = flutesHint(p);
-  const flWarn = fl.src === "missing" ? ' <span class="warn">not in library: enter it</span>'
-    : fl.src === "description" ? ' <span class="warn" title="The tool library has no flute count">from description</span>'
-    : (hint && hint !== fl.z) ? ` <span class="warn" title="The tool description says ${hint} flutes">⚠ description says ${hint}</span>`
-    : (fl.src === "typed" && p.tool.z && p.tool.z !== fl.z) ? ` <span class="warn" title="Typed here; the tool library says ${p.tool.z}">library says ${p.tool.z}</span>` : "";
+  const L = readLimits(), h = helixFor(p, L), so = stickoutFor(p), fl = flutesFor(p);
+  const flWarn = fl.src === "missing" ? ' <span class="warn">not in library: enter it</span>' : "";
   $("opmeta").innerHTML =
     `<span>${esc(p.strategyLabel || p.strategy)}</span>` +
     `<span><b>Ø${g(p.tool.D,3)}</b> mm${p.tool.fluteLen ? ` · ${g(p.tool.fluteLen,3)} long` : ""}</span>` +
@@ -728,7 +721,7 @@ function renderAll(){
     n++;
     tr.className = "okrow"; tr.title = "Open this operation";
     tr.innerHTML = tcell + ncell + pcell + `<td class="q">${cur ?g(cur.Q,3) : "–"}</td><td class="q" style="color:var(--dykem)">${g(opt.best.Q,3)}</td>` +
-      `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td>${flutesInDoubt(p) ? `<td class="l" style="color:var(--warn)" title="The tool library and description disagree on the flute count. Open the operation and enter it; Apply skips it until then.">⚠ flutes</td>` : `<td class="l" style="color:var(--muted)" title="${esc(opt.best.bindLabel)}">${esc(SHORT_LIMIT[opt.best.bindLabel] || opt.best.bindLabel)}</td>`}`;
+      `<td><span class="gain${gain < 0.995 ? " down" : ""}">${isFinite(gain) ? "×" + f(gain,2) : ""}</span></td>${flutesInDoubt(p) ? `<td class="l" style="color:var(--warn)" title="No flute count in the tool library or its description. Open the operation and enter it; Apply skips it until then.">⚠ flutes</td>` : `<td class="l" style="color:var(--muted)" title="${esc(opt.best.bindLabel)}">${esc(SHORT_LIMIT[opt.best.bindLabel] || opt.best.bindLabel)}</td>`}`;
     tr.addEventListener("click", e => { if(e.target.closest("select")) return; idx = i; setMode("one"); });
     tb.appendChild(tr);
   });
@@ -747,10 +740,7 @@ function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne
    in) to each op, plus stock to leave for finish passes, then regenerates. Two clicks: the
    first arms the button for 4 s. Python checks every write and puts an op back on failure. */
 let applyArm = 0, busy = false;
-function flutesInDoubt(p){
-  const fl = flutesFor(p), h = flutesHint(p);
-  return fl.src === "missing" || (fl.src !== "typed" && h && h !== fl.z);
-}
+function flutesInDoubt(p){ return flutesFor(p).src === "missing"; }
 function applyTargets(){
   const todo = mode === "one" ? (ops[idx] ? [ops[idx]] : []) : readable();
   return todo.filter(p => { const R = p.ok && results[opKey(p)]; return R && R.opt && R.opt.ok && !flutesInDoubt(p); });
@@ -769,7 +759,7 @@ function renderApply(){
   btn.disabled = !FUSION || busy || !n;
   btn.textContent = busy ? "Applying…" : applyArm ? `Confirm: write ${n} op${n === 1 ? "" : "s"}` : n > 1 ? `Apply to ${n} ops` : "Apply";
   const doubt = (mode === "one" ? (ops[idx] && ops[idx].ok ? [ops[idx]] : []) : readable()).filter(flutesInDoubt).length;
-  btn.title = !FUSION ? "Open this panel in Fusion to apply" : doubt && !n ? "Check the flute count first: the tool library and its description disagree"
+  btn.title = !FUSION ? "Open this panel in Fusion to apply" : doubt && !n ? "Enter the flute count first: the tool has none"
     : !n ? "Nothing optimized to apply yet"
     : "Write spindle speed and feed (and stock to leave for finish passes), then regenerate the toolpaths";
 }
