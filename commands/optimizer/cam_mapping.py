@@ -44,6 +44,16 @@ LOAD_DEV_NAMES = ['loadDeviation']
 MAX_LOAD_FRACTION = 0.99
 # Used when the deviation can't be read: assume 20 % of the diameter, so the cap is 0.79 D.
 FALLBACK_DEV_FRACTION = 0.20
+# Helical ramp (entry) of adaptives and pockets. All UNVERIFIED like the names above; Apply
+# reads each value back and puts the operation back if one doesn't match.
+RAMP_NAMES = {
+    'vf':    ['tool_feedRamp'],
+    'n':     ['tool_rampSpindleSpeed'],
+    'angle': ['rampAngle', 'helicalRampAngle', 'rampingAngle'],
+    'dia':   ['rampDiameter', 'helicalRampDiameter', 'maximumRampDiameter', 'rampHelixDiameter'],
+}
+RAMP_KIND = {'vf': 'feed', 'n': 'rpm', 'angle': 'deg', 'dia': 'len'}
+RAMP_TYPE = ['rampType', 'entryType']
 # The "Stock to leave" checkbox that enables the two values (a boolean parameter).
 STOCK_FLAG = ['stockToLeave', 'doStockToLeave', 'useStockToLeave']
 PASSES = ('rough', 'wall', 'floor')
@@ -213,13 +223,17 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
         src['ae'] = None                 # a slot's width is the tool; nothing to write
     if src.get('ae') == 'optimalLoad':
         op['aeMax'] = max_optimal_load(op_params, tool['D'], op.get('ae'))
+    ramp = {k: read_value(op_params, names, RAMP_KIND[k]) for k, names in RAMP_NAMES.items()}
+    ramp['type'] = read_text(op_params, RAMP_TYPE)
+    ramp_src = {k: found_name(op_params, RAMP_NAMES[k], RAMP_KIND[k]) for k in ('vf', 'n')}
     stock = {k: read_value(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
     stock_src = {k: found_name(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
     stock_src['flag'] = next((n for n in STOCK_FLAG if n in op_params and isinstance(op_params[n][1], bool)), None)
     return {'ok': True, 'operation': op_name, 'strategy': strategy, 'strategyLabel': label, 'kind': kind_or_reason,
             'toolNumber': card['number'], 'toolDesc': card['description'],
             'tool': tool, 'op': op, 'material': material, 'missing': missing,
-            'src': src, 'stock': stock, 'stockSrc': stock_src}
+            'src': src, 'stock': stock, 'stockSrc': stock_src,
+            'ramp': ramp, 'rampSrc': ramp_src}
 
 
 def max_optimal_load(op_params: dict, D: Optional[float], ae_now: Optional[float]) -> Optional[float]:
@@ -266,11 +280,13 @@ def _fmt(v: float) -> str:
 
 
 def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dict] = None,
-                ae_max: Optional[float] = None) -> list:
+                ae_max: Optional[float] = None, ramp_src: Optional[dict] = None) -> list:
     """The parameter writes for one operation: [(name, expression, kind, target)].
 
     item: {n, vf, pass, ae?, ap?} from the panel (rpm, mm/min, mm). ae/ap are written only
-    when given; ae_max caps an adaptive's optimal load (see max_optimal_load). Finishing passes also set stock to leave: a wall finish leaves `clearance`
+    when given; ae_max caps an adaptive's optimal load (see max_optimal_load). rampVf/rampN
+    (helical ramp feed and spindle speed) are written when given and the operation has those
+    parameters; an op without them still gets its cutting feeds. Finishing passes also set stock to leave: a wall finish leaves `clearance`
     on the floor (axial) and none on the wall; a floor finish the other way round.
     Raises ValueError when something needed is missing, so the op is skipped as a whole:
     half-applied feeds and speeds are worse than none.
@@ -297,6 +313,18 @@ def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dic
                              f'tool diameter, which Fusion refuses. The most this operation allows is '
                              f'{_fmt(ae_max)} mm. Reselect it so the panel picks that up, or tick Keep stepover.')
         writes.append((src[k], f'{_fmt(v)} mm', 'len', round(v, 4)))
+
+    ramp_src = ramp_src or {}
+    for k, kind, unit in (('rampN', 'rpm', 'rpm'), ('rampVf', 'feed', 'mm/min')):
+        if item.get(k) is None:
+            continue
+        v = _num(item[k])
+        if not (v and v > 0):
+            raise ValueError('Invalid ramp ' + ('spindle speed.' if kind == 'rpm' else 'feed.'))
+        name = ramp_src.get('n' if k == 'rampN' else 'vf')
+        if name:
+            v = math.floor(v)
+            writes.append((name, f'{v} {unit}', kind, float(v)))
 
     p = item.get('pass') or 'rough'
     if p not in PASSES:

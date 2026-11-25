@@ -55,7 +55,8 @@ Tools and geometry are still assigned by hand in Fusion; the add-in only sets fe
 - Spindle speed and cutting feed, rounded down to whole rpm and mm/min.
 - For rough passes, stepover/stepdown when you let the optimizer change them or typed them under *Current*.
 - For finish passes, the stock-to-leave checkbox and the radial and axial stock.
-- Not ramp, plunge, lead-in/out or other feeds.
+- On roughing passes with a helical ramp: the ramp feed and ramp spindle speed (see *Helix ramp* below).
+- Not plunge, lead-in/out or other feeds.
 
 Every value is read back after it's written. If Fusion refuses one, or it reads back differently, that operation goes back exactly as it was and the panel says why; the rest still apply. An operation is never half-changed.
 
@@ -129,6 +130,8 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 3. refines around the best point and re-checks it on a 0.05° force curve;
 4. snaps the depth just under a whole multiple of the flute pitch πD/(z·tan β) when that's within 1% of the best. Force is nearly constant there, but only *just under*: go even 0.02 mm deeper and the full slope comes back.
 
+**Helix ramp.** Adaptives and pockets enter with a helical ramp at their own feed, often a slow tool-library default. Each turn of the helix (diameter Ø<sub>h</sub>, angle α) descends p = π·Ø<sub>h</sub>·tan α, and the tool cuts full width, so the ramp is optimized as a slot of depth p under the same limits at the cutting rpm. That gives the feed at the cutting edge. On a circle the outer wall (Ø<sub>h</sub> + D) moves faster than the tool centre, which is what Fusion's feed is, so the ramp feed is that × Ø<sub>h</sub> ÷ (Ø<sub>h</sub> + D), and never above the cutting feed. If the angle or diameter can't be read, 2° and Ø<sub>h</sub> = D are assumed and the panel says so. The end-cutting load on the tool's bottom edges isn't modelled; at a 2° ramp it's tiny.
+
 ## Known limitations
 
 - **Planning values only.** Check every new cut conservatively.
@@ -144,7 +147,7 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 | Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3), and the v0.5 panel shows a tool's flute count from the tool library. Reading a real 3D Adaptive roughing operation, and Apply on it in v0.4.1: spindle speed, feed and stepover were written, read back and the toolpath regenerated. That confirms `tool_spindleSpeed`, `tool_feedCutting` and `optimalLoad`. |
 | Verified by tests | The model and optimizer against the Sandvik and HSM reference cuts (15 Node tests). 42 Python tests against a fake Fusion API: reading operations, expanding setups, skipping unsupported operations, storing the material, limit profiles, and no crash with no document, no CAM data or nothing selected. For Apply, they also cover the write plan for each pass type, read-back checks, rollback when Fusion refuses a value or a parameter is locked, partial bulk applies, and Revert. The panel itself (pass defaults, finish engagement, the two-click Apply, the payload sent to Fusion, Revert, bulk) is driven by a fake Fusion bridge in headless Chrome. |
 | Not verified yet | Wall and floor finish passes (stock to leave), Revert, Apply on a pocket, contour or slot, bulk Apply on several operations, and the v0.5.1 panel background fix (#6). |
-| Unverified names | The other CAM parameter names in `commands/optimizer/cam_mapping.py`: `maximumStepdown` (read, not yet written), `loadDeviation`, `radialStockToLeave`, `axialStockToLeave`, `stockToLeave`, `tool_bodyLength`, …. A wrong name makes Apply refuse that operation with a message; it doesn't write somewhere else. |
+| Unverified names | The other CAM parameter names in `commands/optimizer/cam_mapping.py`: `maximumStepdown` (read, not yet written), `loadDeviation`, `tool_feedRamp`, `tool_rampSpindleSpeed`, `rampAngle`, `rampDiameter`, `rampType`, `radialStockToLeave`, `axialStockToLeave`, `stockToLeave`, `tool_bodyLength`, …. A wrong name makes Apply refuse that operation with a message; it doesn't write somewhere else. |
 
 **Help verify the parameter names:** run the `djr_dump_cam_params` script from the release (Scripts tab → **+** → the unzipped folder → **Run**). Select an adaptive, a 2D contour (with stock to leave ticked), a 2D pocket and a slot first. Then commit its output to `docs/cam_params/`.
 

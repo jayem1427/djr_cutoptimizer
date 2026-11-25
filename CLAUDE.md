@@ -70,7 +70,7 @@ None of this replaces a real Fusion run. Be explicit about what was verified in 
 
 1. **Verify parameter names.** The owner runs `djr_dump_cam_params` on an adaptive, a 2D contour (stock to leave ticked), a 2D pocket and a slot, and the output goes in `docs/cam_params/`. Then fix `OP_NAMES`, `TOOL_NAMES`, `STOCK_NAMES`, `STOCK_FLAG` and `INTERNAL_TO_CALC` in `cam_mapping.py`. The feed and speed internal units are unverified. Expression parsing is used first, so internal units only matter for expressions that reference other parameters.
 2. **Finish Apply in Fusion.** Rough Apply works in Fusion (v0.4.1, 3D Adaptive: rpm, feed and `optimalLoad` written and read back, toolpath regenerated). Still untried for real: wall/floor finish stock to leave, Revert, pocket/contour/slot, bulk. Also check that the feed per tooth follows the cutting feed.
-3. **Later:** scale ramp and plunge feeds with the cutting feed; auto-assign tools and geometry (the owner assigns them by hand for now); "Save as preset" into the tool library; djr_batchpost integration.
+3. **Later:** verify the helix ramp names (`RAMP_NAMES` in `cam_mapping.py`) and scale plunge and lead feeds; auto-assign tools and geometry (the owner assigns them by hand for now); "Save as preset" into the tool library; djr_batchpost integration.
 
 ## Model notes (don't relearn these)
 

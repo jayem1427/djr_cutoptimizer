@@ -277,6 +277,21 @@ class BuildPayload(unittest.TestCase):
                                       cam_mapping.params_to_dict(op.tool.parameters))
         self.assertNotIn('aeMax', p['op'])
 
+    def test_ramp_payload(self):
+        rows = [('tool_spindleSpeed', '24000 rpm', 24000), ('tool_feedCutting', '6000 mm/min', 600.0),
+                ('optimalLoad', '1 mm', 0.1), ('maximumStepdown', '15 mm', 1.5),
+                ('tool_feedRamp', '300 mm/min', 30.0), ('tool_rampSpindleSpeed', '24000 rpm', 24000),
+                ('rampAngle', '2 deg', 0.0349), ('rampDiameter', '8 mm', 0.8), ('rampType', "'helix'", 'helix')]
+        op = _fake_op('adaptive', op_rows=rows)
+        p = cam_mapping.build_payload('adaptive', cam_mapping.params_to_dict(op.parameters),
+                                      cam_mapping.params_to_dict(op.tool.parameters))
+        self.assertEqual(p['rampSrc'], {'vf': 'tool_feedRamp', 'n': 'tool_rampSpindleSpeed'})
+        self.assertAlmostEqual(p['ramp']['vf'], 300)
+        self.assertAlmostEqual(p['ramp']['angle'], 2)
+        self.assertAlmostEqual(p['ramp']['dia'], 8)
+        self.assertEqual(p['ramp']['type'], 'helix')
+        json.dumps(p)
+
     def test_refused(self):
         for s in ('drill', 'thread', 'parallel', 'some_new_thing'):
             p = cam_mapping.build_payload(s, {}, {})
@@ -440,6 +455,19 @@ class PlanWrites(unittest.TestCase):
         w = cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 3000, 'ae': 5.34}, 0.05, None, ae_max=5.34)
         self.assertIn(('optimalLoad', '5.34 mm'), [(n, x) for n, x, _, _ in w])
 
+    def test_ramp_feed_and_speed(self):
+        rs = {'vf': 'tool_feedRamp', 'n': 'tool_rampSpindleSpeed'}
+        w = cam_mapping.plan_writes(self.SRC, {'n': 24000, 'vf': 6000, 'rampVf': 2504.9, 'rampN': 24000}, 0.05,
+                                    None, None, rs)
+        got = [(n, e) for n, e, _, _ in w]
+        self.assertIn(('tool_feedRamp', '2504 mm/min'), got)                  # rounded down
+        self.assertIn(('tool_rampSpindleSpeed', '24000 rpm'), got)
+        # an operation without ramp parameters still gets its cutting feeds
+        w = cam_mapping.plan_writes(self.SRC, {'n': 24000, 'vf': 6000, 'rampVf': 2504}, 0.05, None, None, {})
+        self.assertEqual(len(w), 2)
+        with self.assertRaises(ValueError):
+            cam_mapping.plan_writes(self.SRC, {'n': 24000, 'vf': 6000, 'rampVf': 0}, 0.05, None, None, rs)
+
     def test_write_matches(self):
         M = cam_mapping.write_matches
         self.assertTrue(M('rpm', 18000, '18000 rpm', 18000))
@@ -505,6 +533,20 @@ class Apply(unittest.TestCase):
         self.assertIn('99 %', r['results'][0]['reason'])
         self.assertEqual(op.parameters.expr('optimalLoad'), '1 mm')               # nothing written
         self.assertEqual(op.parameters.expr('tool_spindleSpeed'), '24000 rpm')
+
+    def test_apply_writes_ramp_feed(self):
+        rows = [('tool_spindleSpeed', '20000 rpm', 20000), ('tool_feedCutting', '3000 mm/min', 300.0),
+                ('optimalLoad', '1 mm', 0.1), ('maximumStepdown', '15 mm', 1.5),
+                ('tool_feedRamp', '300 mm/min', 30.0), ('tool_rampSpindleSpeed', '18000 rpm', 18000)]
+        op = _fake_op('adaptive', op_rows=rows, name='Adaptive')
+        p = self._select(op)['Adaptive']
+        r = OptimizerCommand.apply([{'id': p['id'], 'n': 24000, 'vf': 6000, 'pass': 'rough',
+                                     'rampVf': 2500.7, 'rampN': 24000}], 0.05)
+        self.assertTrue(r['ok'], r)
+        self.assertEqual(op.parameters.expr('tool_feedRamp'), '2500 mm/min')
+        self.assertEqual(op.parameters.expr('tool_rampSpindleSpeed'), '24000 rpm')
+        OptimizerCommand.revert()
+        self.assertEqual(op.parameters.expr('tool_feedRamp'), '300 mm/min')
 
     def test_failed_write_puts_the_op_back(self):
         op = _fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall')
