@@ -574,7 +574,7 @@ function syncMaterial(){
   sel.value = known.length === 1 && set.size === 1 ? known[0] : (known[0] || DEFAULT_MAT);
   const unset = readable().some(p => !MATERIALS[p.material]);
   $("matok").classList.toggle("hidden", !(unset && FUSION && readable().length));
-  sel.title = unset ? "Not saved on the setup yet: assumed. Pick the stock material and press Confirm." : "Saved on the setup";
+  sel.title = unset ? "Not saved on the setup yet: assumed. Pick the stock material and click Save to setup." : "Saved on the setup";
 }
 
 /* ---------- render ---------- */
