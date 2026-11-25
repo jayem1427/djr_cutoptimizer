@@ -30,6 +30,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           git fetch --depth=1 origin main
+          git show origin/main:tools/release_intro.md > tools/release_intro.md
           git show origin/main:tools/release_install.md > tools/release_install.md
           git show origin/main:tools/build_release.py > tools/build_release.py
       - uses: actions/setup-python@v5

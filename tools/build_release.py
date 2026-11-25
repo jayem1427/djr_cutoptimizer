@@ -38,13 +38,18 @@ def read_versions() -> tuple[str, str]:
 
 
 def release_notes(version: str) -> str:
-    """The version's CHANGELOG section, then the install steps from tools/release_install.md."""
+    """A short README for the release page: tools/release_intro.md (summary and screenshots),
+    the version's CHANGELOG section as "What's new", then tools/release_install.md (install and
+    quick start). {version} is filled in, so the screenshots are pinned to the release's tag."""
     text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     match = re.search(rf"^## v{re.escape(version)}\b.*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
     if not match:
         sys.exit(f"CHANGELOG.md has no '## v{version}' section")
-    install = (ROOT / "tools" / "release_install.md").read_text(encoding="utf-8")
-    return match.group(1).strip() + "\n\n" + install.replace("{version}", version).strip() + "\n"
+    tools = ROOT / "tools"
+    intro = (tools / "release_intro.md").read_text(encoding="utf-8")
+    install = (tools / "release_install.md").read_text(encoding="utf-8")
+    parts = [intro, f"## What's new in v{version}\n\n" + match.group(1).strip(), install]
+    return "\n\n".join(p.replace("{version}", version).strip() for p in parts) + "\n"
 
 
 def files_under(folder: Path):
