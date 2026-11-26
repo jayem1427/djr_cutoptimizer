@@ -177,6 +177,8 @@ class OptimizerCommand:
             args.returnData = json.dumps(cls.apply(data.get('items'), data.get('clearance')))
         elif action == 'revert':
             args.returnData = json.dumps(cls.revert())
+        elif action == 'savePreset':
+            args.returnData = json.dumps(cls.save_preset(data))
         else:
             args.returnData = json.dumps({'ok': False, 'reason': f'unknown action {action}'})
 
@@ -241,6 +243,7 @@ class OptimizerCommand:
             op_name=name, material=material,
             tool_json=_safe(lambda: tool.toJson()))
         payload['setup'] = setup_name
+        payload['preset'] = _safe(lambda: op.toolPreset.name) or None
         payload['id'] = _op_id(setup_name, name)
         cls._ops[payload['id']] = op
         return payload
@@ -405,6 +408,144 @@ class OptimizerCommand:
         except Exception:
             Utils.handleError('apply')
             return {'ok': False, 'reason': 'Apply failed. See the Text Command window for details.', 'results': []}
+
+    # ---------------------------------------------------------------- presets
+    @staticmethod
+    def _set_preset_values(preset, writes) -> list:
+        """Write the values into a preset. Returns a list of problems (empty when all went in)."""
+        problems = []
+        for name, expr, kind, target in writes:
+            p = _safe(lambda: preset.parameters.itemByName(name))
+            if p is None:
+                problems.append(f'{name} isn’t a preset parameter')
+                continue
+            try:
+                p.expression = expr
+            except Exception as e:
+                problems.append(f'Fusion refused {name} = {expr} ({e})')
+                continue
+            if not cam_mapping.write_matches(kind, target, _safe(lambda: p.expression, ''), _safe(lambda: p.value.value)):
+                problems.append(f'{name} reads back as “{_safe(lambda: p.expression, "")}”')
+        return problems
+
+    @staticmethod
+    def _preset_on(tool, name):
+        """The preset called `name` on this tool, created if it doesn't exist yet."""
+        presets = tool.presets
+        found = _safe(lambda: presets.itemsByName(name))
+        if found:
+            for i in range(len(found)):
+                if (_safe(lambda: found[i].name) or '').lower() == name.lower():   # Fusion matches names case-insensitively
+                    found[i].name = name
+                    return found[i], False
+        preset = presets.add()
+        preset.name = name
+        return preset, True
+
+    @staticmethod
+    def _library_tool(lib, guid):
+        """The tool with this guid in a tool library (or document tool library), else None."""
+        for i in range(_safe(lambda: lib.count, 0) or 0):
+            t = _safe(lambda: lib.item(i))
+            if t is not None and cam_mapping.tool_guid(_safe(lambda: t.toJson())) == guid:
+                return t
+        return None
+
+    @classmethod
+    def _save_to_libraries(cls, guid, name, writes) -> str:
+        """Add the preset to the same tool in the user's local and cloud tool libraries."""
+        try:
+            libs = adsk.cam.CAMManager.get().libraryManager.toolLibraries
+        except Exception as e:
+            return f'tool libraries aren’t reachable from the API ({e})'
+        urls, stack = [], []
+        for loc in ('LocalLibraryLocation', 'CloudLibraryLocation'):
+            where = getattr(adsk.cam.LibraryLocations, loc, None)
+            root = _safe(lambda: libs.urlByLocation(where)) if where is not None else None
+            if root is not None:
+                stack.append(root)
+        while stack:
+            url = stack.pop()
+            for i in range(_safe(lambda: len(libs.childAssetURLs(url)), 0) or 0):
+                urls.append(libs.childAssetURLs(url)[i])
+            for i in range(_safe(lambda: len(libs.childFolderURLs(url)), 0) or 0):
+                stack.append(libs.childFolderURLs(url)[i])
+        saved = []
+        for url in urls:
+            lib = _safe(lambda: libs.toolLibraryAtURL(url))
+            tool = cls._library_tool(lib, guid) if lib is not None else None
+            if tool is None:
+                continue
+            try:
+                preset, _ = cls._preset_on(tool, name)
+                problems = cls._set_preset_values(preset, writes)
+                if problems:
+                    return f'{_safe(lambda: url.leafName, "library")}: ' + '; '.join(problems)
+                if not libs.updateToolLibrary(url, lib):
+                    return f'Fusion didn’t save {_safe(lambda: url.leafName, "the library")}'
+                saved.append(_safe(lambda: url.leafName, 'library') or 'library')
+            except Exception as e:
+                return f'couldn’t write to {_safe(lambda: url.leafName, "the library")} ({e})'
+        if not saved:
+            return 'this tool isn’t in any of your local or cloud tool libraries'
+        return 'saved to ' + ', '.join(saved)
+
+    @classmethod
+    def save_preset(cls, item) -> dict:
+        """Save an optimized cut as a preset on the operation's tool.
+
+        item: {id, name, values: {n, vf, rampN?, rampVf?, ae?, ap?}, assign?, library?}.
+        The preset is added to (or updates) the tool in this document; `assign` makes the
+        operation use it; `library` also adds it to the same tool in the user's tool libraries.
+        """
+        try:
+            cam, reason = cls._cam()
+            if cam is None:
+                return {'ok': False, 'reason': reason}
+            item = item if isinstance(item, dict) else {}
+            name = str(item.get('name') or '').strip()[:80]
+            if not name:
+                return {'ok': False, 'reason': 'Give the preset a name.'}
+            try:
+                writes = cam_mapping.preset_writes(item.get('values') or {})
+            except ValueError as e:
+                return {'ok': False, 'reason': str(e)}
+            op = cls._find_op(cam, str(item.get('id', '')))
+            if op is None:
+                return {'ok': False, 'reason': 'Operation not found. Reselect it.'}
+            op_tool = _safe(lambda: op.tool)
+            if op_tool is None or _safe(lambda: op_tool.presets) is None:
+                return {'ok': False, 'reason': 'This Fusion version can’t add tool presets from an add-in.'}
+            guid = cam_mapping.tool_guid(_safe(lambda: op_tool.toJson()))
+            doc_lib = _safe(lambda: cam.documentToolLibrary)
+            tool = (cls._library_tool(doc_lib, guid) if doc_lib is not None and guid else None) or op_tool
+            preset, created = cls._preset_on(tool, name)
+            problems = cls._set_preset_values(preset, writes)
+            if problems:
+                return {'ok': False, 'reason': 'The preset wasn’t saved: ' + '; '.join(problems)}
+            if doc_lib is not None and tool is not op_tool:
+                try:
+                    doc_lib.update(tool)
+                except TypeError:
+                    doc_lib.update(tool, False)
+            out = {'ok': True, 'name': name, 'created': created, 'saved': [f'{k} = {e}' for k, e, _, _ in writes]}
+            if item.get('assign'):
+                fresh = _safe(lambda: op.tool)
+                found = _safe(lambda: fresh.presets.itemsByName(name))
+                target = found[0] if found else None
+                ok = False
+                if target is not None:
+                    try:
+                        op.toolPreset = target
+                        ok = _safe(lambda: op.toolPreset.name) == name
+                    except Exception:
+                        ok = False
+                out['assigned'] = ok
+            if item.get('library'):
+                out['library'] = cls._save_to_libraries(guid, name, writes) if guid else 'the tool has no id to match in a library'
+            return out
+        except Exception as e:
+            return {'ok': False, 'reason': f'Saving the preset failed ({e})'}
 
     @classmethod
     def revert(cls) -> dict:

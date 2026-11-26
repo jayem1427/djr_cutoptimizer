@@ -1,0 +1,694 @@
+Operation: Rough Channels - 2D Pocket #1
+Strategy: pocket2d
+Fusion: 2706.1.17
+
+== operation.parameters (443) ==
+name                                                                 expression                      value                   editable  title
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+advancedMode                                                         false                           False                   False     Advanced Mode
+betaMode                                                             false                           False                   False     Beta Mode
+alphaMode                                                            false                           False                   False     Alpha Mode
+isXpress                                                             false                           False                   False     Inventor CAM Express
+licenseMultiaxis                                                     true                            True                    False     Multi-axis licensed
+license3D                                                            true                            True                    False     3D licensed
+metric                                                               true                            True                    False     Metric
+isAssemblyDocument                                                   true                            True                    False     IsAssemblyDocument
+context                                                              'operation'                     operation               False     Context
+strategy                                                             'pocket2d'                      pocket2d                False     Strategy
+operation_description                                                '2D Offset Roughing'            2D Offset Roughing      False     Operation description
+group_tool                                                           true                            True                    False     Tool
+isOperationTemplate                                                  false                           False                   False     Is Operation Template
+isFeatureTemplate                                                    false                           False                   False     Is Feature Template
+isTappingOperation                                                   false                           False                   False     Is Tapping Operation
+isDrillingOperation                                                  false                           False                   False     Is Drilling Operation
+tool_selectionMethod                                                 'specific'                      specific                False     Tool Selection
+tool_searchMethod                                                    'exact'                         exact                   False     Search By
+tool_exactDiameter                                                   10mm                            1.0                     False     Diameter
+tool_diameterRatio                                                   1.0                             1.0                     False     Tool Diameter Ratio
+tool_searchTolerance                                                 0.1mm                           0.010000000000000002    False     Diameter Tolerance
+tool_minDiameter                                                     5mm                             0.5                     False     Minimum Diameter
+tool_maxDiameter                                                     10mm                            1.0                     False     Maximum Diameter
+tool_minDiameterRatio                                                0.5                             0.5                     False     Minimum Diameter Ratio
+tool_maxDiameterRatio                                                1.0                             1.0                     False     Maximum Diameter Ratio
+tool_checkLengthBelowHolder                                          false                           False                   False     Use Length Below Holder
+tool_minLengthBelowHolder                                            0mm                             0.0                     False     Minimum Length Below Holder
+tool_maxLengthBelowHolder                                            30mm                            3.0                     False     Maximum Length Below Holder
+tool_checkCornerRadius                                               false                           False                   False     Use Corner Radius
+tool_minCornerRadius                                                 0mm                             0.0                     False     Minimum Corner Radius
+tool_maxCornerRadius                                                 tool_diameter / 4               0.07500000000000001     False     Maximum Corner Radius
+tool_type                                                            'flat end mill'                 flat end mill           False     Type
+undercut                                                             true                            False                   False     
+tool_isTurning                                                       tool_type == 'turning boring'   False                   False     Turning Tool
+tool_isMill                                                          tool_type == 'thread mill' ||   True                    False     Milling Tool
+tool_isDrill                                                         tool_type == 'counter bore' ||  False                   False     Drilling Tool
+tool_isJet                                                           tool_type == 'laser cutter' ||  False                   False     Jet Tool
+tool_isDepositing                                                    tool_type == 'laser powder' ||  False                   False     Depositing Tool
+tool_taperedType                                                     'tapered_bull_nose'             tapered_bull_nose       False     Tapered Type
+tool_unit                                                            'millimeters'                   millimeters             False     Unit
+tool_number                                                          1                               1                       False     Number
+tool_diameterOffset                                                  tool_number                     1                       False     Diameter Offset
+tool_lengthOffset                                                    tool_number                     1                       False     Length Offset
+tool_compensationOffset                                              tool_number                     1                       False     Compensation Offset
+tool_turret                                                          0                               0                       False     Turret
+tool_manualToolChange                                                false                           False                   False     Manual Tool Change
+tool_breakControl                                                    false                           False                   False     Break Control
+tool_live                                                            true                            True                    False     Live Tool
+tool_material                                                        'carbide'                       carbide                 False     Material
+tool_description                                                     '3mm ldo tool'                  3mm ldo tool            False     Description
+tool_comment                                                         ''                                                      False     Comment
+tool_vendor                                                          'ldo'                           ldo                     False     Vendor
+tool_productId                                                       ''                                                      False     Product ID
+tool_productLink                                                     ''                                                      False     Product Link
+tool_diameter                                                        3.                              0.30000000000000004     False     Diameter
+tool_maximumCuttingDiameter                                          tool_diameter + 2*tool_fluteLe  0.0                     False     Maximum Diameter
+tool_tipDiameter                                                     0.0                             0.30000000000000004     False     Tip Diameter
+tool_tipOffset                                                       0.0                             0.0                     False     Tip Offset
+tool_cornerRadius                                                    0.0                             0.0                     False     Corner Radius
+tool_inclusiveAngle                                                  tool_taperAngle * 2             0.0                     False     Inclusive Angle
+tool_taperAngle                                                      0.0                             0.0                     False     Taper Angle
+tool_tipAngle                                                        (tool_type == 'counter sink')   0.0                     False     Tip Angle
+tool_threadTipType                                                   tool_type == 'thread mill' ? '  point                   False     Thread Tip Type
+tool_threadTipWidth                                                  tool_type == 'thread mill' ? t  0.0                     False     Thread Tip Width
+tool_threadTipRadius                                                 (((tool_type == 'thread mill'   0.0                     False     Thread Tip Radius
+tool_threadProfileAngle                                              60.                             0.0                     False     Thread Profile Angle
+tool_tipLength                                                       0.0                             0.0                     False     Tip Length
+tool_fluteLength                                                     12.7                            1.27                    False     Flute Length
+tool_shoulderLength                                                  tool_fluteLength                1.27                    False     Shoulder Length
+tool_bodyLength                                                      15.24                           1.524                   False     Body Length
+tool_overallLength                                                   38.1                            3.8100000000000005      False     Overall Length
+tool_shaftDiameter                                                   tool_diameter                   0.30000000000000004     False     Shaft Diameter
+tool_segmentHeight                                                   tool_shaftDiameter/2            0.15000000000000002     False     Segment Height
+tool_segmentDiameterLower                                            tool_shaftDiameter*2            0.6000000000000001      False     Lower Diameter
+tool_segmentDiameterUpper                                            tool_shaftDiameter*2            0.6000000000000001      False     Upper Diameter
+tool_shaftSegmentHeight                                              Math.max((tool_bodyLength - to  0.12699999999999997     False     Segment Height
+tool_shaftSegmentDiameterLower                                       tool_diameter                   0.30000000000000004     False     Lower Diameter
+tool_shaftSegmentDiameterUpper                                       tool_shaftDiameter              0.30000000000000004     False     Upper Diameter
+tool_threadPitch                                                     0.0                             0.0                     False     Thread Pitch
+tool_maximumThreadPitch                                              1.0mm                           0.0                     False     Maximum Thread Pitch
+tool_minimumThreadPitch                                              1.0mm                           0.0                     False     Minimum Thread Pitch
+tool_numberOfTeeth                                                   1                               0                       False     Number of Teeth
+tool_numberOfFlutes                                                  1                               1                       False     Number of Flutes
+tool_shoulderDiameter                                                3.                              0.30000000000000004     False     Shoulder Diameter
+tool_upperRadius                                                     (tool_type == 'circle segment   0.1                     False     Upper Radius
+tool_profileRadius                                                   (tool_type == 'circle segment   10.0                    False     Profile Radius
+tool_lowerRadius                                                     (tool_type == 'circle segment   0.1                     False     Lower Radius
+tool_axialDistance                                                   tool_fluteLength / 2            0.1                     False     Axial Distance
+tool_chamferWidth                                                    1mm                             0.1                     False     Chamfer Width
+tool_chamferAngle                                                    45deg                           45.0                    False     Chamfer Angle
+holder_attached                                                      true                            True                    False     Attached Holder
+holder_description                                                   'ER16-A Nut (uxcell M19)'       ER16-A Nut (uxcell M19  False     Holder Description
+holder_comment                                                       ''                                                      False     Holder Comment
+holder_vendor                                                        'uxcell'                        uxcell                  False     Holder Vendor
+holder_productId                                                     'B07KM3LY59'                    B07KM3LY59              False     Holder Product ID
+holder_productLink                                                   ''                                                      False     Holder Product Link
+holder_libraryName                                                   ''                                                      False     Holder Library
+tool_holderGaugeLength                                               20.                             2.0                     False     Tool Holder Gauge Length
+tool_assemblyGaugeLength                                             78.0796                         7.8079600000000005      False     Tool Assembly Gauge Length
+group_feedspeed                                                      true                            True                    False     Feed & Speed
+preset_search                                                        'default'                       manual                  False     Preset
+preset_contains                                                      ''                                                      False     Preset Contains
+tool_spindleSpeed                                                    24000                           24000.0                 True      Spindle Speed
+tool_stockDiameter                                                   tool_isTurning ? (tool_unit ==  0.30000000000000004     False     Stock Diameter
+tool_surfaceSpeed                                                    tool_diameter * Math.PI * tool  226194.6710584651       True      Surface Speed
+tool_rampSpindleSpeed                                                24000                           24000.0                 True      Ramp Spindle Speed
+tool_feedCutting                                                     1800mm/min                      1800.0                  True      Cutting Feedrate
+tool_feedPerTooth                                                    tool_spindleSpeed > 0 ? tool_f  0.0075                  True      Feed per Tooth
+tool_feedEntry                                                       500mmpm                         500.0                   True      Lead-In Feedrate
+tool_feedExit                                                        tool_isDepositing ? 1000mmpm :  1800.0                  True      Lead-Out Feedrate
+tool_feedTransition                                                  tool_feedCutting                1800.0                  True      Transition Feedrate
+tool_feedRamp                                                        300mmpm                         300.0                   True      Ramp Feedrate
+tool_feedPlunge                                                      150mmpm                         150.0                   True      Plunge Feedrate
+tool_feedPerRevolution                                               (tool_spindleSpeed > 0) ? tool  0.0006250000000000001   True      Plunge Feed per Revolution
+tool_feedRetract                                                     tool_feedPlunge                 150.0                   False     Retract Feedrate
+tool_clockwise                                                       true                            True                    False     Clockwise Spindle Rotation
+tool_coolant                                                         'disabled'                      disabled                True      Coolant
+featureOperationId                                                   'none'                          none                    True      Feature Operation ID
+surfaceZHigh                                                         -1.                             -0.1                    False     
+surfaceZLow                                                          -23.                            -2.3000000000000003     False     
+surfaceXLow                                                          -121.00000000000001             -12.100000000000001     False     Surface X Low
+surfaceXHigh                                                         121.00000000000001              12.100000000000001      False     Surface X High
+surfaceYLow                                                          -82.75                          -8.275                  False     Surface Y Low
+surfaceYHigh                                                         82.75                           8.275                   False     Surface Y High
+stockZHigh                                                           0.0                             0.0                     False     
+stockZLow                                                            -23.                            -2.3000000000000003     False     
+stockXLow                                                            -122.00000000000001             -12.200000000000003     False     Stock X Low
+stockXHigh                                                           122.00000000000001              12.200000000000003      False     Stock X High
+stockYLow                                                            -83.75                          -8.375                  False     Stock Y Low
+stockYHigh                                                           83.75                           8.375                   False     Stock Y High
+machiningTypeGroup                                                   true                            True                    False     Machining Type
+multiAxisMachiningType                                               'three_axis'                    three_axis              True      Machining Type
+overrideToolView                                                     false                           False                   True      Tool Orientation
+view_orientation_mode                                                'axesZX'                        useWCS                  False     Tool Orientation
+view_orientation_axisZ                                               false                           <adsk.core.BaseVector;  False     Z Axis
+view_orientation_flipZ                                               false                           False                   False     Flip Z Axis
+view_orientation_axesZX_unselected_default                           'wcs'                           wcs                     False     Unselected Axis Default
+view_orientation_axesZY_unselected_default                           'wcs'                           wcs                     False     Unselected Axis Default
+view_orientation_axesXY_unselected_default                           'wcs'                           wcs                     False     Unselected Axis Default
+view_orientation_cSys                                                false                           <adsk.core.BaseVector;  False     Coordinate System
+view_orientation_surfaceNormal                                       false                           <adsk.core.BaseVector;  False     Surface Point
+view_orientation_axisX                                               false                           <adsk.core.BaseVector;  False     X Axis
+view_orientation_flipX                                               false                           False                   False     Flip X Axis
+view_orientation_axisY                                               false                           <adsk.core.BaseVector;  False     Y Axis
+view_orientation_flipY                                               false                           False                   False     Flip Y Axis
+view_align_to_view_direction                                         false                           <adsk.core.BaseVector;  False     Align to View
+view_select_angles                                                   'turn_and_tilt'                 turn_and_tilt           False     Select Angles
+view_turn_from_recipe                                                0.0                             0.0                     False     Turn
+view_tilt_from_recipe                                                0.0                             0.0                     False     Tilt
+view_origin_mode                                                     (view_orientation_mode == 'sur  jobOrigin               False     Origin
+view_origin_point                                                    false                           <adsk.core.BaseVector;  False     Tool Orientation Origin
+view_model_point                                                     true                            <adsk.core.BaseVector;  False     Model Point
+view_origin_boxPoint                                                 'top center'                    top center              False     Bounding Box Point
+view_stock_point                                                     true                            <adsk.core.BaseVector;  False     Stock Point
+show_machine                                                         false                           False                   False     Show Machine
+wrapGroup                                                            true                            True                    False     Wrap
+unwrap                                                               true                            True                    False     Unwrap Geometry
+wrap_cylinder                                                        false                           <adsk.core.BaseVector;  False     Wrap Cylinder
+wrap_cylinder_radius                                                 0mm                             0.0                     False     
+wrap_nominalRadius_offset                                            0mm                             0.0                     False     Offset
+wrap_nominalRadius_value                                             wrap_cylinder_radius + wrap_no  0.0                     False     Radius
+leadLean                                                             true                            True                    False     Tool Axis
+tiltTool                                                             false                           False                   False     Collision Avoidance
+useRotaryAxisMoves                                                   true                            False                   False     Use Rotations to Fit Limits
+usePolarWhenNecessary                                                true                            False                   False     Allow Polar Moves
+threeAxisPolarMode                                                   'prefer-control'                prefer-control          False     Polar Mode
+threeAxisPolarLineAngle                                              0deg                            0.0                     False     Polar Line Angle
+polarMachiningGroup                                                  true                            True                    False     Polar Machining
+polarMode                                                            'prefer-control'                prefer-control          False     Mode
+polarLineAngle                                                       0deg                            0.0                     False     Line Angle
+group_geometry                                                       true                            True                    False     Geometry
+canBeFallbackOperation                                               true                            False                   False     Can Be Fallback Operation
+isFallbackOperation                                                  false                           False                   False     Fallback Operation
+isContourGeometry                                                    false                           False                   False     Is Contour
+geometryType                                                         'chains'                        chains                  False     Select Geometry Using
+featureSignatureType                                                 'walls_and_floors'              walls_and_floors        False     Feature type
+featureGeometryType                                                  'chains'                        chains                  False     Select Geometry Using
+pockets                                                              true                                                    True      Pocket Selections
+pockets_detectOpenPockets                                            true                            True                    True      Detect Open Pockets
+pockets_connectOpenPockets                                           true                            True                    True      Connect Open Pockets
+pockets_errorCheck                                                   true                            True                    True      Check Geometry
+pockets_detectOverlaps                                               false                           False                   True      Detect Overlaps
+auto_holeTopDiameter                                                 unavailable                     0.0                     False     Hole Top Diameter
+useRestMachining                                                     false                           False                   True      Rest Machining
+restMaterialCutterDiameter                                           tool_diameter * 2               0.6000000000000001      False     Tool Diameter
+restMaterialCornerRadius                                             0 mm                            0.0                     False     Corner Radius
+restMaterialTaperAngle                                               0deg                            0.0                     False     Taper Angle
+restMaterialShoulderLength                                           restMaterialCutterDiameter      0.0                     False     Shoulder Length
+restMaterialStockToLeave                                             0mm                             0.0                     False     Stock to Leave
+restMaterialTool                                                     ''                                                      False     
+useStockContours                                                     rampType == 'disabled'          False                   True      Stock Contours
+stockContours                                                        false                                                   False     Stock Selections
+isClearanceAreaEnabled                                               false                           False                   False     Is Multi-Axis
+clearanceHeight_group                                                true                            True                    False     Clearance Height
+clearanceHeight_mode                                                 'from retract height'           from retract height     True      From
+clearanceHeight_ref                                                  false                           <adsk.core.BaseVector;  False     Clearance Height Reference
+clearanceHeightFromHighest_checkStock                                'top'                           top                     False     Stock
+clearanceHeightFromLowest_checkStock                                 'bottom'                        bottom                  False     Stock
+clearanceHeightFromHighest_checkModel                                'top'                           top                     False     Model
+clearanceHeightFromLowest_checkModel                                 'bottom'                        bottom                  False     Model
+clearanceHeightFromHighest_checkFixture                              'top'                           top                     False     Fixture
+clearanceHeightFromLowest_checkFixture                               'bottom'                        bottom                  False     Fixture
+clearanceHeight_offset                                               10mm                            1.0                     True      Offset
+clearanceHeight_value                                                15.                             1.5                     False     
+clearanceHeight_absolute                                             true                            True                    False     
+retractHeight_group                                                  true                            True                    False     Retract Height
+retractHeight_mode                                                   'from stock top'                from stock top          True      From
+retractHeight_ref                                                    false                           <adsk.core.BaseVector;  False     Retract Height Reference
+retractHeightFromHighest_checkStock                                  'top'                           top                     False     Stock
+retractHeightFromLowest_checkStock                                   'bottom'                        bottom                  False     Stock
+retractHeightFromHighest_checkModel                                  'top'                           top                     False     Model
+retractHeightFromLowest_checkModel                                   'bottom'                        bottom                  False     Model
+retractHeightFromHighest_checkFixture                                'top'                           top                     False     Fixture
+retractHeightFromLowest_checkFixture                                 'bottom'                        bottom                  False     Fixture
+retractHeight_offset                                                 5mm                             0.5                     True      Offset
+retractHeight_value                                                  5.                              0.5                     False     
+retractHeight_absolute                                               true                            True                    False     
+feedHeight_group                                                     true                            True                    False     Feed Height
+feedHeight_mode                                                      'from top'                      from top                True      From
+feedHeight_ref                                                       false                           <adsk.core.BaseVector;  False     Feed Height Reference
+feedHeightFromHighest_checkStock                                     'ignore'                        ignore                  False     Stock
+feedHeightFromLowest_checkStock                                      'ignore'                        ignore                  False     Stock
+feedHeightFromHighest_checkModel                                     'top'                           top                     False     Model
+feedHeightFromLowest_checkModel                                      'bottom'                        bottom                  False     Model
+feedHeightFromHighest_checkFixture                                   'ignore'                        ignore                  False     Fixture
+feedHeightFromLowest_checkFixture                                    'ignore'                        ignore                  False     Fixture
+feedHeight_offset                                                    5mm                             0.5                     True      Offset
+feedHeight_value                                                     5.                              0.5                     False     Feed Height
+useZFeed                                                             (feedHeight_mode == 'disabled'  True                    False     
+feedHeight_absolute                                                  true                            True                    False     
+topHeight_group                                                      true                            True                    False     Top Height
+topHeight_mode                                                       'from stock top'                from stock top          True      From
+topHeight_ref                                                        false                           <adsk.core.BaseVector;  False     Top Reference
+topHeightFromHighest_checkStock                                      'top'                           top                     False     Stock
+topHeightFromLowest_checkStock                                       'bottom'                        bottom                  False     Stock
+topHeightFromHighest_checkModel                                      'ignore'                        ignore                  False     Model
+topHeightFromLowest_checkModel                                       'ignore'                        ignore                  False     Model
+topHeightFromHighest_checkFixture                                    'ignore'                        ignore                  False     Fixture
+topHeightFromLowest_checkFixture                                     'ignore'                        ignore                  False     Fixture
+topHeight_offset                                                     0mm                             0.0                     True      Offset
+topHeight_value                                                      0.0                             0.0                     False     
+topHeight_absolute                                                   true                            True                    False     
+bottomHeight_group                                                   true                            True                    False     Bottom Height
+bottomHeight_mode                                                    'from contour'                  from contour            True      From
+bottomHeight_ref                                                     false                           <adsk.core.BaseVector;  False     Bottom Reference
+bottomHeightFromHighest_checkStock                                   'bottom'                        bottom                  False     Stock
+bottomHeightFromLowest_checkStock                                    'ignore'                        ignore                  False     Stock
+bottomHeightFromHighest_checkModel                                   'bottom'                        bottom                  False     Model
+bottomHeightFromLowest_checkModel                                    'bottom'                        bottom                  False     Model
+bottomHeightFromHighest_checkFixture                                 'ignore'                        ignore                  False     Fixture
+bottomHeightFromLowest_checkFixture                                  'ignore'                        ignore                  False     Fixture
+bottomHeight_offset                                                  0mm                             0.0                     True      Offset
+bottomHeight_value                                                   0.0                             0.0                     False     
+bottomHeight_absolute                                                false                           False                   False     
+group_passes                                                         true                            True                    False     Passes
+tolerance                                                            0.01mm                          0.001                   True      Tolerance
+contourTolerance                                                     tolerance * 0.5                 0.0005                  True      Contour Linearization Tolerance
+smoothingFilterToleranceFactor                                       0.6667                          0.6667                  False     Smoothing Tolerance Factor
+calculationTolerance                                                 tolerance                       0.001                   True      Calculation Tolerance
+thinningTolerance                                                    0.01*calculationTolerance       1e-05                   True      Thinning Tolerance
+chainingTolerance                                                    0.01mm                          0.001                   True      Chaining Tolerance
+gougingTolerance                                                     calculationTolerance            0.001                   False     
+compensation                                                         'left'                          left                    True      Sideways Compensation
+rightCompensation                                                    compensation == 'right'         False                   False     
+minimumCuttingRadius                                                 0.0                             0.0                     True      Minimum Cutting Radius
+fragmentExtensionDistance                                            0                               0.0                     True      Fragment Extension Distance
+preserveOrder                                                        false                           False                   True      Preserve Order
+bothWays                                                             false                           False                   True      Both Ways
+maximumStepover                                                      tool_diameter * 0.6             0.18                    True      Maximum Stepover
+minimumCuttingRadiusJl                                               minimumCuttingRadius            0.0                     False     
+useMorphedSpiralMachining                                            false                           False                   True      Use Morphed Spiral Machining
+minimumRoughingStepover                                              0.1 * maximumStepover           0.018                   False     
+allowStepoverCusps                                                   false                           False                   True      Allow Stepover Cusps
+flatTipRadius                                                        tool_type == 'tapered mill' ?   0.15000000000000002     False     
+maximumEnsureCutRadius                                               ((tool_type == 'chamfer mill')  0.14625000000000002     False     
+ensureCutRadius                                                      allowStepoverCusps ? maximumEn  0.14625000000000002     False     
+applyFinalSmoothingDeviation                                         false                           False                   False     
+smoothingDeviation                                                   0.1mm                           0.010000000000000002    True      Smoothing Deviation
+minimumFinishingStepover                                             0.25*finishingStepover          0.0075000000000000015   False     
+spiralCircularPockets                                                rampType != 'profile'           False                   True      Spiral Circular Pockets JL
+doMultipleDepths                                                     true                            True                    True      Multiple Depths
+maximumStepdown                                                      2mm                             0.2                     True      Maximum Roughing Stepdown
+numberOfFinishingStepdowns                                           0                               0                       True      Finishing Stepdowns
+finishingStepdown                                                    0.2mm                           0.020000000000000004    True      Finishing Stepdown
+slopeAngle                                                           tool_taperAngle                 0.0                     True      Wall Taper Angle (deg)
+wallTaperAngle                                                       doMultipleDepths ? slopeAngle   0.0                     False     
+onlyFinishFinal                                                      false                           False                   False     Finish Only at Final Depth
+roughFinal                                                           true                            True                    False     Rough Final
+useEvenStepdowns                                                     true                            True                    True      Use Even Stepdowns
+orderByDepth                                                         false                           False                   True      Order by Depth
+orderByStep                                                          false                           False                   True      Order by Step
+doFinishingPasses                                                    false                           False                   True      Finishing Passes
+compensationType                                                     'computer'                      computer                False     Compensation Type
+compensationTypeProxy                                                'computer'                      computer                False     Compensation Type
+compensationDeltaRadius                                              (numberOfFinishingStepovers >   0.0                     False     Compensation Radius Allowance
+finishingSmoothingDeviation                                          0mm                             0.0                     False     Finishing Smoothing Deviation
+numberOfFinishingStepovers                                           1                               0                       False     Number of Finishing Passes
+finishingStepover                                                    Math.min(tool_diameter * 0.1;   0.030000000000000006    False     Stepover
+leadsForAllFinishingPasses                                           compensationType != 'computer'  False                   False     Leads on all Finishing Passes
+finishFeedrate                                                       tool_feedCutting                1800.0                  False     Finish Feedrate
+nullPass                                                             false                           False                   False     Repeat Finishing Pass
+finishingOverlap                                                     0mm                             0.0                     False     Finishing Overlap
+useStockToLeave                                                      true                            True                    True      Stock to Leave
+stockToLeave                                                         0.15mm                          0.015000000000000003    True      Radial Stock to Leave
+verticalStockToLeave                                                 0.05mm                          0.005000000000000001    True      Axial Stock to Leave
+simpleStockToLeave                                                   false                           False                   True      Simple Stock To Leave
+useCombinedFilter                                                    true                            True                    False     Use Combined Filter
+useDMKSmoothing                                                      true                            False                   False     Use DMK smoothing
+smoothingFilter                                                      false                           False                   True      Smoothing
+smoothingFilterMode                                                  'fitArcs'                       fitArcs                 False     Smoothing Mode
+smoothingFilterMaxSpacing                                            0.5mm                           0.05                    False     Maximum Spacing
+smoothingFilterMaxAngle                                              3deg                            3.0                     False     Maximum Angular Limit
+legacySmoothingFilterTolerance                                       tolerance * 0.1                 0.0                     False     Smoothing Tolerance
+useFeedOptimization                                                  false                           False                   True      Feed Optimization
+reducedFeedChange                                                    25deg                           25.0                    False     Maximum Directional Change
+reducedFeedRadius                                                    tool_diameter * 0.05            0.0                     False     Reduced Feed Radius
+reducedFeedDistance                                                  tool_diameter * 0.2             0.0                     False     Reduced Feed Distance
+reducedFeedrate                                                      tool_feedCutting * 0.25         450.0                   False     Reduced Feedrate
+reduceOnlyInnerCorners                                               true                            True                    False     Only Inner Corners
+surfaceSpeedOnArcs                                                   false                           False                   False     Surface Speed On Arcs
+maximumReducedFeedrateInternalArcFinishing                           100                             100.0                   False     Maximum Reduced Feedrate On Internal Arc For Finishing Passes
+maximumIncreasedFeedrateExternalArcFinishing                         100                             100.0                   False     Maximum Increased Feedrate On External Arc For Finishing Passes
+maximumReducedFeedrateInternalArc                                    100                             100.0                   False     Maximum Reduced Feedrate On Internal Arc
+maximumIncreasedFeedrateExternalArc                                  100                             100.0                   False     Maximum Increased Feedrate On External Arc
+group_linking                                                        true                            True                    False     Linking
+highFeedrateMode                                                     'disabled'                      disabled                True      High Feedrate Mode
+highFeedrateModeProxy                                                'always'                        always                  False     High Feedrate Mode
+highFeedrate                                                         machine.defined && machine.max  1800.0                  False     High Feedrate
+allowRapidRetract                                                    true                            True                    True      Allow Rapid Retract
+safeDistance                                                         Math.min(1.0mm; tool_diameter   0.06000000000000001     True      Safe Distance
+keepToolDown                                                         true                            True                    True      Keep Tool Down
+stayDownDistance                                                     50mm                            5.0                     True      Maximum Stay-Down Distance
+liftHeight                                                           0mm                             0.0                     True      Lift Height
+group_leadsTranstions                                                true                            True                    False     Leads & Transitions
+smoothTransitions                                                    true                            True                    False     
+doLeadIn                                                             true                            True                    True      Lead-In (Entry)
+entry_radius                                                         tool_diameter * 0.1             0.030000000000000006    True      Horizontal Lead-In Radius
+entry_sweep                                                          90.0deg                         90.0                    True      Lead-In Sweep Angle
+entry_distance                                                       tool_diameter * 0.1             0.030000000000000006    True      Linear Lead-In Distance
+entry_perpendicular                                                  false                           False                   True      Perpendicular
+entry_verticalRadius                                                 entry_radius                    0.030000000000000006    True      Vertical Lead-In Radius
+leadInRadius                                                         entry_radius                    0.030000000000000006    False     
+leadInVerticalRadius                                                 entry_verticalRadius            0.030000000000000006    False     
+doLeadOut                                                            true                            True                    True      Lead-Out (Exit)
+exit_sameAsEntry                                                     true                            True                    True      Same as Lead-In
+exit_radius                                                          tool_diameter * 0.1             0.030000000000000006    False     Horizontal Lead-Out Radius
+exit_sweep                                                           90.0deg                         90.0                    False     Lead-Out Sweep Angle
+exit_distance                                                        tool_diameter * 0.1             0.030000000000000006    False     Linear Lead-Out Distance
+exit_perpendicular                                                   false                           False                   False     Perpendicular
+exit_verticalRadius                                                  exit_radius                     0.030000000000000006    False     Vertical Lead-Out Radius
+leadOutRadius                                                        exit_radius                     0.030000000000000006    False     
+leadOutVerticalRadius                                                exit_verticalRadius             0.030000000000000006    False     
+doRamp                                                               true                            True                    False     Ramp
+rampType                                                             'profile'                       profile                 True      Ramp Type
+allowPlungingOutsideStockJl                                          (rampType == 'disabled')        False                   False     
+rampAngle                                                            2deg                            2.0                     True      Ramping Angle (deg)
+maximumRampZStepdown                                                 maximumStepdown > 0 ? maximumS  0.2                     True      Maximum Ramp Stepdown
+rampClearanceHeight                                                  2.5mm                           0.25                    True      Ramp Clearance Height
+rampRadialClearance                                                  0                               0.0                     True      Ramp Radial Clearance
+helicalRampDiameter                                                  Math.max((tool_diameter - 2 *   0.28500000000000003     True      Helical Ramp Diameter
+minimumRampDiameter                                                  Math.max((tool_diameter - 2 *   0.15000000000000002     True      Minimum Ramp Diameter
+smoothRampJl                                                         false                           False                   False     
+allowPlunging                                                        (rampType == 'plunge')          False                   False     
+allowHelicalRamps                                                    rampType == 'helix'             False                   False     
+allowContourRamps                                                    (rampType == 'helix') || (ramp  False                   False     
+allowSmoothContourRamps                                              (rampType == 'helix') || (ramp  False                   False     
+allowZigZagRamps                                                     rampType == 'zigzag'            False                   False     
+group_entry_drill_positions                                          true                            True                    False     Positions
+predrillPositions                                                    false                           <adsk.core.BaseVector;  True      Predrill Positions
+entryPositions                                                       false                           <adsk.core.BaseVector;  True      Preferred Lead-In Positions
+exitPositions                                                        false                           <adsk.core.BaseVector;  True      Exit Positions
+generate_connections                                                 false                           False                   True      Override Connection to Preceding Operation
+connections_retraction_type                                          'full'                          full                    False     Retraction
+connectionMoveClearanceAreaType                                      'plane'                         plane                   False     Type
+connectionMoveClearanceArea_orientation_mode                         connectionMoveClearanceAreaTyp  setupAxisZ              False     Orientation
+connectionMoveClearanceArea_orientation_selAxis                      false                           <adsk.core.BaseVector;  False     Axis
+connectionMoveClearanceArea_orientation_flipAxis                     false                           False                   False     Flip Axis
+connectionMoveClearanceArea_orientation_axisZ                        false                           <adsk.core.BaseVector;  False     Z Axis
+connectionMoveClearanceArea_orientation_flipZ                        false                           False                   False     Flip Z Axis
+connectionMoveClearanceArea_orientation_axisX                        false                           <adsk.core.BaseVector;  False     X Axis
+connectionMoveClearanceArea_orientation_flipX                        false                           False                   False     Flip X Axis
+connectionMoveClearanceArea_orientation_axesZX_unselected_default    'wcs'                           wcs                     False     Unselected Axis Default
+connectionMoveClearanceArea_orientation_axisY                        false                           <adsk.core.BaseVector;  False     Y Axis
+connectionMoveClearanceArea_orientation_flipY                        false                           False                   False     Flip Y Axis
+connectionMoveClearanceArea_orientation_axesZY_unselected_default    'wcs'                           wcs                     False     Unselected Axis Default
+connectionMoveClearanceArea_flipDirection                            false                           False                   False     Flip direction
+connectionMoveClearanceAreaUp_orientation_mode                       'setupAxisZ'                    setupAxisZ              False     Clearance up
+connectionMoveClearanceAreaUp_orientation_selAxis                    false                           <adsk.core.BaseVector;  False     Axis
+connectionMoveClearanceAreaUp_orientation_flipAxis                   false                           False                   False     Flip Axis
+connectionMoveClearanceAreaUp_flipDirection                          false                           False                   False     Flip clearance up
+connectionMoveClearanceArea_origin_mode                              (connectionMoveClearanceArea_o  jobOrigin               False     Origin
+connectionMoveClearanceArea_origin_point                             false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaHeight_mode                               'from stock top'                from stock top          False     From
+connectionMoveClearanceAreaHeight_ref                                false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaHeight_offset                             10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaHeight_value                              10.                             0.0                     False     Height
+connectionMoveClearanceAreaHeight_absolute                           true                            False                   False     
+connectionMoveClearanceAreaCylinderRadius_mode                       'from stock od'                 from stock od           False     From
+connectionMoveClearanceAreaCylinderRadius_ref                        false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaCylinderRadiusFromOutermost_checkStock    'outer diameter'                outer diameter          False     Stock 
+connectionMoveClearanceAreaCylinderRadiusFromOutermost_checkModel    'outer diameter'                outer diameter          False     Model
+connectionMoveClearanceAreaCylinderRadiusFromOutermost_checkFixture  'outer diameter'                outer diameter          False     Fixture
+connectionMoveClearanceAreaCylinderRadius_offset                     10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaCylinderRadius_direct                     connectionMoveClearanceAreaCyl  0.2                     False     Value
+connectionMoveClearanceAreaCylinderRadius_value                      10.                             0.1                     False     Radius
+connectionMoveClearanceAreaCylinderRadius_absolute                   true                            True                    False     
+connectionMoveClearanceAreaCylinderCapPosZHeight_mode                'from stock top'                from stock top          False     From
+connectionMoveClearanceAreaCylinderCapPosZHeight_ref                 false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaCylinderCapPosZHeight_offset              10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaCylinderCapPosZHeight_value               10.                             0.0                     False     Height
+connectionMoveClearanceAreaCylinderCapPosZHeight_absolute            true                            False                   False     
+connectionMoveClearanceAreaSphereRadius_mode                         'from stock od'                 from stock od           False     From
+connectionMoveClearanceAreaSphereRadius_ref                          false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaSphereRadiusFromOutermost_checkStock      'outer diameter'                outer diameter          False     Stock 
+connectionMoveClearanceAreaSphereRadiusFromOutermost_checkModel      'outer diameter'                outer diameter          False     Model
+connectionMoveClearanceAreaSphereRadiusFromOutermost_checkFixture    'outer diameter'                outer diameter          False     Fixture
+connectionMoveClearanceAreaSphereRadius_offset                       10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaSphereRadius_direct                       connectionMoveClearanceAreaSph  0.2                     False     Value
+connectionMoveClearanceAreaSphereRadius_value                        10.                             0.1                     False     Radius
+connectionMoveClearanceAreaSphereRadius_absolute                     true                            True                    False     
+connectionMoveClearanceAreaCuboid_mode                               'from stock box'                from stock box          False     Mode
+connectionMoveClearanceAreaCuboid_symmetricalOffsets                 true                            True                    False     Symmetry
+connectionMoveClearanceAreaCuboidPosX_value                          132.                            0.0                     False     Value +X (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidPosX_offset                         10mm                            1.0                     False     Offset +X
+connectionMoveClearanceAreaCuboidNegX_value                          132.                            0.0                     False     Value -X (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidNegX_offset                         10mm                            1.0                     False     Offset -X
+connectionMoveClearanceAreaCuboidPosY_value                          93.75                           0.0                     False     Value +Y (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidPosY_offset                         10mm                            1.0                     False     Offset +Y
+connectionMoveClearanceAreaCuboidNegY_value                          93.75                           0.0                     False     Value -Y (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidNegY_offset                         10mm                            1.0                     False     Offset -Y
+connectionMoveClearanceAreaCuboidPosZ_value                          10.                             0.0                     False     Value +Z (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidPosZ_offset                         10mm                            1.0                     False     Offset +Z
+connectionMoveClearanceAreaCuboidNegZ_value                          33.                             0.0                     False     Value -Z (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidNegZ_offset                         10mm                            1.0                     False     Offset -Z
+use_tool_stepdown                                                    true                            True                    False     Use Stepdown
+tool_stepdown                                                        0.2032                          0.020320000000000005    False     Stepdown
+tool_finishingStepdown                                               0.2mm                           0.020000000000000004    False     Finishing Stepdown
+use_tool_stepover                                                    true                            True                    False     Use Stepover
+tool_stepover                                                        2.032                           0.20319999999999996     False     Stepover
+tool_finishingStepover                                               tool_diameter * 0.1             0.030000000000000006    False     Finishing Stepover
+tool_rampType                                                        'helix'                         helix                   False     Ramping Strategy
+tool_rampAngle                                                       2.                              2.0                     False     Ramp Angle
+associatedView                                                       false                           <adsk.core.BaseVector;  True      Associated View
+
+== operation.tool.parameters (219) ==
+name                                                                 expression                      value                   editable  title
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+advancedMode                                                         false                           False                   False     Advanced Mode
+betaMode                                                             false                           False                   False     Beta Mode
+alphaMode                                                            false                           False                   False     Alpha Mode
+isXpress                                                             false                           False                   False     Inventor CAM Express
+licenseMultiaxis                                                     true                            True                    False     Multi-axis licensed
+license3D                                                            true                            True                    False     3D licensed
+metric                                                               true                            True                    False     Metric
+isAssemblyDocument                                                   false                           False                   False     IsAssemblyDocument
+context                                                              ''                                                      False     Context
+strategy                                                             'tool'                          tool                    False     Strategy
+operation_description                                                ''                                                      False     Operation description
+group_tool                                                           true                            True                    False     Tool
+isOperationTemplate                                                  false                           False                   False     Is Operation Template
+isFeatureTemplate                                                    false                           False                   False     Is Feature Template
+tool_type                                                            'flat end mill'                 flat end mill           True      Type
+undercut                                                             true                            False                   False     
+tool_isTurning                                                       tool_type == 'turning boring'   False                   False     Turning Tool
+tool_isMill                                                          tool_type == 'thread mill' ||   True                    False     Milling Tool
+tool_isDrill                                                         tool_type == 'counter bore' ||  False                   False     Drilling Tool
+tool_isJet                                                           tool_type == 'laser cutter' ||  False                   False     Jet Tool
+tool_isDepositing                                                    tool_type == 'laser powder' ||  False                   False     Depositing Tool
+tool_taperedType                                                     'tapered_bull_nose'             tapered_bull_nose       False     Tapered Type
+tool_unit                                                            'millimeters'                   millimeters             True      Unit
+tool_number                                                          1                               1                       True      Number
+tool_diameterOffset                                                  tool_number                     1                       True      Diameter Offset
+tool_lengthOffset                                                    tool_number                     1                       True      Length Offset
+tool_compensationOffset                                              tool_number                     1                       True      Compensation Offset
+tool_turret                                                          0                               0                       True      Turret
+tool_manualToolChange                                                false                           False                   True      Manual Tool Change
+tool_breakControl                                                    false                           False                   True      Break Control
+tool_live                                                            true                            True                    True      Live Tool
+tool_material                                                        'carbide'                       carbide                 True      Material
+tool_description                                                     '3mm ldo tool'                  3mm ldo tool            True      Description
+tool_comment                                                         ''                                                      True      Comment
+tool_vendor                                                          'ldo'                           ldo                     True      Vendor
+tool_productId                                                       ''                                                      True      Product ID
+tool_productLink                                                     ''                                                      True      Product Link
+tool_maximumRotationalSpeed                                          1000rpm                         1000.0                  False     Maximum Drive RPM
+tool_isHalfIndex                                                     false                           False                   False     Half Index
+tool_numberOfAttachmentPoints                                        0                               0                       False     Attachment points
+tool_numberOfTools                                                   1                               1                       False     Number of Tools
+tool_orientationType                                                 'axial'                         axial                   False     Orientation
+tool_machineSideConnectionType                                       'Unspecified'                   Unspecified             False     Connection Type
+tool_adaptiveItemSize                                                0                               0                       False     Size
+tool_spindleInversion                                                false                           False                   False     Spindle Inversion
+tool_gearRatio                                                       1                               1.0                     False     Gear Ratio
+tool_stationNumber                                                   0                               0                       False     Station Number
+tool_maximumToolRotationalSpeed                                      tool_maximumRotationalSpeed *   1000.0                  False     Maximum Tool RPM
+tool_block_attached                                                  false                           False                   False     Attached Tool Block
+tool_block_description                                               ''                                                      False     Tool Block Description
+tool_block_vendor                                                    ''                                                      False     Tool Block Vendor
+tool_block_productId                                                 ''                                                      False     Tool Block Product ID
+tool_block_productLink                                               ''                                                      False     Tool Block Product Link
+tool_block_comment                                                   ''                                                      False     Tool Block Comment
+tool_block_live                                                      false                           False                   False     Tool Block Live
+tool_block_maximumRotationalSpeed                                    1000.                           1000.0                  False     Tool Block Maximum Drive RPM
+tool_block_isHalfIndex                                               false                           False                   False     Tool Block Half Index
+tool_block_numberOfAttachmentPoints                                  0                               0                       False     Tool Block Attachment points
+tool_block_numberOfTools                                             1                               1                       False     Tool Block Number of Tools
+tool_block_orientationType                                           'axial'                         axial                   False     Tool Block Orientation
+tool_block_machineSideConnectionType                                 'Unspecified'                   Unspecified             False     Tool Block Connection Type
+tool_block_adaptiveItemSize                                          0.0                             0                       False     Tool Block Size
+tool_block_spindleInversion                                          false                           False                   False     Tool Block Spindle Inversion
+tool_block_gearRatio                                                 1.                              1.0                     False     Tool Block Gear Ratio
+tool_block_stationNumber                                             0                               0                       False     Tool Block Station Number
+tool_diameter                                                        3.                              0.30000000000000004     True      Diameter
+tool_maximumCuttingDiameter                                          tool_diameter + 2*tool_fluteLe  0.0                     False     Maximum Diameter
+tool_tipDiameter                                                     0.0                             0.30000000000000004     False     Tip Diameter
+tool_tipOffset                                                       0.0                             0.0                     False     Tip Offset
+tool_cornerRadius                                                    0.0                             0.0                     False     Corner Radius
+tool_inclusiveAngle                                                  tool_taperAngle * 2             0.0                     False     Inclusive Angle
+tool_taperAngle                                                      0.0                             0.0                     False     Taper Angle
+tool_tipAngle                                                        (tool_type == 'counter sink')   0.0                     False     Tip Angle
+tool_threadTipType                                                   tool_type == 'thread mill' ? '  point                   False     Thread Tip Type
+tool_threadTipWidth                                                  tool_type == 'thread mill' ? t  0.0                     False     Thread Tip Width
+tool_threadTipRadius                                                 (((tool_type == 'thread mill'   0.0                     False     Thread Tip Radius
+tool_threadProfileAngle                                              60.                             0.0                     False     Thread Profile Angle
+tool_tipLength                                                       0.0                             0.0                     False     Tip Length
+tool_fluteLength                                                     12.7                            1.27                    True      Flute Length
+tool_shoulderLength                                                  tool_fluteLength                1.27                    True      Shoulder Length
+tool_bodyLength                                                      15.24                           1.524                   True      Body Length
+tool_overallLength                                                   38.1                            3.8100000000000005      True      Overall Length
+tool_shaftDiameter                                                   tool_diameter                   0.30000000000000004     True      Shaft Diameter
+tool_segmentHeight                                                   tool_shaftDiameter/2            0.15000000000000002     False     Segment Height
+tool_segmentDiameterLower                                            tool_shaftDiameter*2            0.6000000000000001      False     Lower Diameter
+tool_segmentDiameterUpper                                            tool_shaftDiameter*2            0.6000000000000001      False     Upper Diameter
+tool_shaftSegmentHeight                                              Math.max((tool_bodyLength - to  0.12699999999999997     False     Segment Height
+tool_shaftSegmentDiameterLower                                       tool_diameter                   0.30000000000000004     False     Lower Diameter
+tool_shaftSegmentDiameterUpper                                       tool_shaftDiameter              0.30000000000000004     False     Upper Diameter
+tool_threadPitch                                                     0.0                             0.0                     False     Thread Pitch
+tool_maximumThreadPitch                                              1.0mm                           0.0                     False     Maximum Thread Pitch
+tool_minimumThreadPitch                                              1.0mm                           0.0                     False     Minimum Thread Pitch
+tool_numberOfTeeth                                                   1                               0                       False     Number of Teeth
+tool_numberOfFlutes                                                  1                               1                       True      Number of Flutes
+tool_shoulderDiameter                                                3.                              0.30000000000000004     True      Shoulder Diameter
+tool_upperRadius                                                     (tool_type == 'circle segment   0.1                     False     Upper Radius
+tool_profileRadius                                                   (tool_type == 'circle segment   10.0                    False     Profile Radius
+tool_lowerRadius                                                     (tool_type == 'circle segment   0.1                     False     Lower Radius
+tool_axialDistance                                                   tool_fluteLength / 2            0.1                     False     Axial Distance
+tool_chamferWidth                                                    1mm                             0.1                     False     Chamfer Width
+tool_chamferAngle                                                    45deg                           45.0                    False     Chamfer Angle
+tool_kerfWidth                                                       0.0                             0.2                     False     Kerf Width
+tool_nozzleDiameter                                                  0.0                             0.1                     False     Nozzle Diameter
+tool_headClearance                                                   0.0                             0.1                     False     Head Clearance
+tool_machineQualityControl                                           'manual'                        manual                  False     Quality Control
+holder_attached                                                      true                            True                    False     Attached Holder
+holder_description                                                   'ER16-A Nut (uxcell M19)'       ER16-A Nut (uxcell M19  True      Holder Description
+holder_comment                                                       ''                                                      True      Holder Comment
+holder_vendor                                                        'uxcell'                        uxcell                  True      Holder Vendor
+holder_productId                                                     'B07KM3LY59'                    B07KM3LY59              True      Holder Product ID
+holder_productLink                                                   ''                                                      True      Holder Product Link
+holder_libraryName                                                   ''                                                      True      Holder Library
+tool_holderGaugeLength                                               20.                             2.0                     True      Tool Holder Gauge Length
+tool_assemblyGaugeLength                                             78.0796                         7.8079600000000005      True      Tool Assembly Gauge Length
+group_feedspeed                                                      true                            True                    False     Feed & Speed
+tool_spindleSpeed                                                    24000.                          24000.0                 True      Spindle Speed
+tool_stockDiameter                                                   tool_isTurning ? (tool_unit ==  0.30000000000000004     False     Stock Diameter
+tool_surfaceSpeed                                                    tool_diameter * Math.PI * tool  226194.6710584651       True      Surface Speed
+tool_rampSpindleSpeed                                                tool_spindleSpeed               24000.0                 True      Ramp Spindle Speed
+tool_useFeedPerRevolution                                            tool_isTurning                  False                   False     Use Feed per Revolution
+tool_feedCutting                                                     1800.                           1800.0                  True      Cutting Feedrate
+tool_feedPerTooth                                                    tool_spindleSpeed > 0 ? tool_f  0.0075                  True      Feed per Tooth
+tool_feedProbeLink                                                   3000mmpm                        3000.0                  False     Link Feedrate
+tool_feedEntry                                                       500.                            500.0                   True      Lead-In Feedrate
+tool_feedExit                                                        tool_isDepositing ? 1000mmpm :  1800.0                  True      Lead-Out Feedrate
+tool_feedTransition                                                  tool_feedCutting                1800.0                  True      Transition Feedrate
+tool_feedProbeMeasure                                                102mmpm                         102.0                   False     Measure Feedrate
+tool_feedRamp                                                        300.                            300.0                   True      Ramp Feedrate
+tool_feedPlunge                                                      150.                            150.0                   True      Plunge Feedrate
+tool_feedPerRevolution                                               tool_spindleSpeed > 0 ? tool_f  0.0006250000000000001   True      Plunge Feed per Revolution
+tool_feedRetract                                                     tool_feedPlunge                 150.0                   False     Retract Feedrate
+tool_feedRetractPerRevolution                                        tool_feedPerRevolution          0.0                     False     Retract Feed per Revolution
+tool_clockwise                                                       true                            True                    True      Clockwise Spindle Rotation
+tool_coolant                                                         'disabled'                      disabled                True      Coolant
+tool_coolantSupport                                                  'no'                            no                      True      Coolant Support
+generate_connections                                                 false                           False                   True      Override Connection to Preceding Operation
+connections_retraction_type                                          'full'                          full                    False     Retraction
+connectionMoveClearanceAreaType                                      'plane'                         plane                   False     Type
+connectionMoveClearanceArea_orientation_mode                         connectionMoveClearanceAreaTyp  setupAxisZ              False     Orientation
+connectionMoveClearanceArea_orientation_selAxis                      false                           <adsk.core.BaseVector;  False     Axis
+connectionMoveClearanceArea_orientation_flipAxis                     false                           False                   False     Flip Axis
+connectionMoveClearanceArea_orientation_axisZ                        false                           <adsk.core.BaseVector;  False     Z Axis
+connectionMoveClearanceArea_orientation_flipZ                        false                           False                   False     Flip Z Axis
+connectionMoveClearanceArea_orientation_axisX                        false                           <adsk.core.BaseVector;  False     X Axis
+connectionMoveClearanceArea_orientation_flipX                        false                           False                   False     Flip X Axis
+connectionMoveClearanceArea_orientation_axesZX_unselected_default    'wcs'                           wcs                     False     Unselected Axis Default
+connectionMoveClearanceArea_orientation_axisY                        false                           <adsk.core.BaseVector;  False     Y Axis
+connectionMoveClearanceArea_orientation_flipY                        false                           False                   False     Flip Y Axis
+connectionMoveClearanceArea_orientation_axesZY_unselected_default    'wcs'                           wcs                     False     Unselected Axis Default
+connectionMoveClearanceArea_flipDirection                            false                           False                   False     Flip direction
+connectionMoveClearanceAreaUp_orientation_mode                       'setupAxisZ'                    setupAxisZ              False     Clearance up
+connectionMoveClearanceAreaUp_orientation_selAxis                    false                           <adsk.core.BaseVector;  False     Axis
+connectionMoveClearanceAreaUp_orientation_flipAxis                   false                           False                   False     Flip Axis
+connectionMoveClearanceAreaUp_flipDirection                          false                           False                   False     Flip clearance up
+connectionMoveClearanceArea_origin_mode                              (connectionMoveClearanceArea_o  jobOrigin               False     Origin
+connectionMoveClearanceArea_origin_point                             false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaHeight_mode                               'from stock top'                from stock top          False     From
+connectionMoveClearanceAreaHeight_ref                                false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaHeight_offset                             10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaHeight_value                              0mm                             0.0                     False     Height
+connectionMoveClearanceAreaHeight_absolute                           false                           False                   False     
+connectionMoveClearanceAreaCylinderRadius_mode                       'from stock od'                 from stock od           False     From
+connectionMoveClearanceAreaCylinderRadius_ref                        false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaCylinderRadiusFromOutermost_checkStock    'outer diameter'                outer diameter          False     Stock 
+connectionMoveClearanceAreaCylinderRadiusFromOutermost_checkModel    'outer diameter'                outer diameter          False     Model
+connectionMoveClearanceAreaCylinderRadiusFromOutermost_checkFixture  'outer diameter'                outer diameter          False     Fixture
+connectionMoveClearanceAreaCylinderRadius_offset                     10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaCylinderRadius_direct                     connectionMoveClearanceAreaCyl  0.2                     False     Value
+connectionMoveClearanceAreaCylinderRadius_value                      1mm                             0.1                     False     Radius
+connectionMoveClearanceAreaCylinderRadius_absolute                   false                           False                   False     
+connectionMoveClearanceAreaCylinderCapPosZHeight_mode                'from stock top'                from stock top          False     From
+connectionMoveClearanceAreaCylinderCapPosZHeight_ref                 false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaCylinderCapPosZHeight_offset              10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaCylinderCapPosZHeight_value               0mm                             0.0                     False     Height
+connectionMoveClearanceAreaCylinderCapPosZHeight_absolute            false                           False                   False     
+connectionMoveClearanceAreaSphereRadius_mode                         'from stock od'                 from stock od           False     From
+connectionMoveClearanceAreaSphereRadius_ref                          false                           <adsk.core.BaseVector;  False     Selection
+connectionMoveClearanceAreaSphereRadiusFromOutermost_checkStock      'outer diameter'                outer diameter          False     Stock 
+connectionMoveClearanceAreaSphereRadiusFromOutermost_checkModel      'outer diameter'                outer diameter          False     Model
+connectionMoveClearanceAreaSphereRadiusFromOutermost_checkFixture    'outer diameter'                outer diameter          False     Fixture
+connectionMoveClearanceAreaSphereRadius_offset                       10mm                            1.0                     False     Offset
+connectionMoveClearanceAreaSphereRadius_direct                       connectionMoveClearanceAreaSph  0.2                     False     Value
+connectionMoveClearanceAreaSphereRadius_value                        1mm                             0.1                     False     Radius
+connectionMoveClearanceAreaSphereRadius_absolute                     false                           False                   False     
+connectionMoveClearanceAreaCuboid_mode                               'from stock box'                from stock box          False     Mode
+connectionMoveClearanceAreaCuboid_symmetricalOffsets                 true                            True                    False     Symmetry
+connectionMoveClearanceAreaCuboidPosX_value                          0mm                             0.0                     False     Value +X (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidPosX_offset                         10mm                            1.0                     False     Offset +X
+connectionMoveClearanceAreaCuboidNegX_value                          0mm                             0.0                     False     Value -X (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidNegX_offset                         10mm                            1.0                     False     Offset -X
+connectionMoveClearanceAreaCuboidPosY_value                          0mm                             0.0                     False     Value +Y (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidPosY_offset                         10mm                            1.0                     False     Offset +Y
+connectionMoveClearanceAreaCuboidNegY_value                          0mm                             0.0                     False     Value -Y (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidNegY_offset                         10mm                            1.0                     False     Offset -Y
+connectionMoveClearanceAreaCuboidPosZ_value                          0mm                             0.0                     False     Value +Z (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidPosZ_offset                         10mm                            1.0                     False     Offset +Z
+connectionMoveClearanceAreaCuboidNegZ_value                          0mm                             0.0                     False     Value -Z (INTERNAL ONLY)
+connectionMoveClearanceAreaCuboidNegZ_offset                         10mm                            1.0                     False     Offset -Z
+tool_presetMaterialCategory                                          'all'                           all                     True      Filter by Type
+tool_presetMaterialQuery                                             ''                                                      True      Filter by Search
+tool_presetMaterialUseHardness                                       false                           False                   True      Filter by hardness
+tool_presetMaterialMinimumHardness                                   0.0                             0.0                     False     Minimum hardness
+tool_presetMaterialMaximumHardness                                   100.0                           100.0                   False     Maximum hardness
+use_tool_stepdown                                                    true                            True                    True      Use Stepdown
+tool_stepdown                                                        0.2032                          0.020320000000000005    True      Stepdown
+tool_finishingStepdown                                               0.2mm                           0.020000000000000004    False     Finishing Stepdown
+use_tool_stepover                                                    true                            True                    True      Use Stepover
+tool_stepover                                                        2.032                           0.20319999999999996     True      Stepover
+tool_finishingStepover                                               tool_diameter * 0.1             0.030000000000000006    False     Finishing Stepover
+tool_rampType                                                        'helix'                         helix                   False     Ramping Strategy
+tool_rampAngle                                                       2.                              2.0                     True      Ramp Angle
+tool_cutHeight                                                       (tool_type == 'waterjet' ? 3mm  0.15000000000000002     False     Cut Height
+tool_cutPower                                                        (tool_type == 'laser cutter' ?  30.0                    False     Cut Power
+tool_pierceHeight                                                    (tool_type == 'laser cutter' ?  0.4                     False     Pierce Height
+tool_pierceTime                                                      1s                              1.0                     False     Pierce Time
+tool_piercePower                                                     (tool_type == 'laser cutter' ?  30.0                    False     Pierce Power
+tool_assistGas                                                       (tool_type == 'laser cutter' ?  Air                     False     Assist Gas
+tool_pressure                                                        (tool_type == 'waterjet' ? 400  4.0                     False     Pressure
+tool_abrasiveFlowRate                                                1                               1.0                     False     Abrasive Flow Rate
+
+== operation.toolPreset.parameters (17) ==
+name                         expression                      value                   editable  title
+---------------------------------------------------------------------------------------------------------------------
+tool_spindleSpeed            20000.                          20000.0                 True      Spindle Speed
+tool_surfaceSpeed            tool_diameter * Math.PI * tool  188495.5592153876       True      Surface Speed
+tool_rampSpindleSpeed        tool_spindleSpeed               20000.0                 True      Ramp Spindle Speed
+tool_feedCutting             1016.                           1016.0                  True      Cutting Feedrate
+tool_feedPerTooth            tool_spindleSpeed > 0 ? tool_f  0.00508                 True      Feed per Tooth
+tool_feedEntry               tool_type == 'probe' || tool_i  1016.0                  True      Lead-In Feedrate
+tool_feedExit                tool_isDepositing ? 1000mmpm :  1016.0                  True      Lead-Out Feedrate
+tool_feedTransition          tool_feedCutting                1016.0                  True      Transition Feedrate
+tool_feedRamp                tool_feedPlunge                 127.0                   True      Ramp Feedrate
+tool_feedPlunge              127.                            127.0                   True      Plunge Feedrate
+tool_feedPerRevolution       tool_spindleSpeed > 0 ? tool_f  0.000635                True      Plunge Feed per Revolution
+tool_coolant                 'disabled'                      disabled                True      Coolant
+tool_presetMaterialCategory  'all'                           all                     True      Filter by Type
+tool_presetMaterialQuery     ''                                                      True      Filter by Search
+tool_stepdown                0.2032                          0.020320000000000005    True      Stepdown
+tool_stepover                2.032                           0.20319999999999996     True      Stepover
+tool_rampAngle               2.                              2.0                     True      Ramp Angle

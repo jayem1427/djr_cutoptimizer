@@ -81,6 +81,7 @@ input:disabled, select:disabled{ opacity:.55; }
 .box:focus-within{ outline:2px solid var(--accent); outline-offset:1px; }
 .box span{ color:var(--muted); flex:none; padding-left:4px; }
 .lim .matrow{ display:flex; gap:6px; align-items:center; min-width:0; }
+#presetName{ flex:1; min-width:0; width:0; }
 .sub{ border-top:1px solid var(--row-line); margin-top:4px; }
 .sub > summary{ height:28px; display:flex; align-items:center; gap:6px; padding-left:0; color:var(--chev); cursor:pointer; list-style:none; }
 .sub > summary::-webkit-details-marker{ display:none; }
@@ -241,6 +242,14 @@ canvas{ display:block; width:100%; height:128px; }
         <p class="verdict" id="verdict"></p>
       </div>
     </details>
+    <details class="sec hidden" id="presetSec" open>
+      <summary>Tool preset</summary>
+      <div class="body lim">
+        <div class="r"><label for="presetName" title="Saves the optimized speed, feed, ramp and stepover/stepdown as a preset on this operation's tool. A preset with the same name is updated.">Name</label><span class="matrow"><input id="presetName" maxlength="80" aria-label="Preset name"><button type="button" class="btn" id="savePreset">Save</button></span></div>
+        <div class="r"><span></span><label class="chk"><input type="checkbox" id="presetAssign" checked>Use it on this operation</label></div>
+        <div class="r"><span></span><label class="chk"><input type="checkbox" id="presetLib">Also add it to my tool library</label></div>
+      </div>
+    </details>
     <details class="sec" open>
       <summary>Force over one revolution</summary>
       <div class="body">
@@ -305,7 +314,7 @@ const MATERIALS = {
 };
 const E_CARBIDE = 600000;   // N/mm², solid carbide (same as the calculator)
 const DEFAULT_MAT = "Aluminium (wrought)";
-const VERSION = "0.5.2";
+const VERSION = "0.6.0";
 const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","aePct","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","tmax","eta","deflFinish","clearance"];
 const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", hmMin:"", nmax:24000, aePct:40, vfmax:"", deflMax:"", vcMin:"", vcMax:"", helixDefault:35, pmax:1.5, tmax:0.6, eta:0.8,
   deflFinish:0.01, clearance:0.05 };
@@ -592,6 +601,7 @@ function shortReason(r){
 
 /* ---------- load from Fusion ---------- */
 function loadOps(r, keepPlace){
+  if(!keepPlace) presetTyped = false;
   if(!r || !r.ok){
     if(!ops.length){ setMsg(r && r.reason || "Couldn’t read the selection."); renderCard(); }
     else setMsg(r && r.reason || "");
@@ -667,6 +677,7 @@ function renderCard(){
     `<span>helix <input id="helix" class="num" value="${h.helix}" inputmode="decimal" aria-label="Helix angle">°${h.assumed ? ' <span class="assumed" title="This tool has no helix angle in Fusion">assumed</span>' : ""}</span>` +
     `<span>stickout <input id="so" class="num" value="${+g(so.so,3).replace(/,/g,"")}" inputmode="decimal" aria-label="Tool stickout">mm${so.assumed ? ' <span class="assumed" title="Not read from the tool: assumed 1.25 × flute length">assumed</span>' : ""}</span>` +
     `<span>Setup <b>${esc(p.setup)}</b></span>` +
+    (p.preset ? `<span title="The tool preset this operation uses">preset <b>${esc(p.preset)}</b></span>` : "") +
     (p.toolDesc ? `<span title="${esc(p.toolDesc)}">${esc(p.toolDesc.length > 28 ? p.toolDesc.slice(0,27) + "…" : p.toolDesc)}</span>` : "");
   $("helix").addEventListener("change", e => {
     const v = parseFloat(e.target.value);
@@ -793,7 +804,7 @@ function renderAll(){
     `<span><b>${n}</b> of ${ops.length} optimized · removal rate in cm³/min</span><span>${gainN ? `average <b class="gain">×${f(gainSum/gainN,2)}</b>` : ""}</span>`;
 }
 
-function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne(); else renderAll(); renderApply(); }
+function render(){ moreSummary(); renderChipAuto(); if(mode === "one") renderOne(); else renderAll(); renderApply(); renderPreset(); }
 
 /* ---------- apply ----------
    Writes rpm and feed (and, for rough passes, a stepover/stepdown that was optimized or typed
@@ -865,6 +876,38 @@ function onApply(){
     $("revert").classList.toggle("hidden", !r.canRevert);
     reread(ok, bad);
   }, () => { busy = false; renderApply(); setMsg("Couldn’t reach Fusion."); });
+}
+/* Tool presets: save the optimized cut on the operation's tool, so new operations with that
+   tool start from it. The name is filled in from material and pass until you type your own. */
+let presetTyped = false;
+function presetDefault(p){
+  return `djr · ${materialFor(p)} · ${PASS_LABEL[passFor(p)] || "Rough"}`;
+}
+function renderPreset(){
+  const p = mode === "one" ? ops[idx] : null, R = p && p.ok && results[opKey(p)];
+  const can = !!(R && R.opt && R.opt.ok);
+  $("presetSec").classList.toggle("hidden", !can);
+  if(!can) return;
+  if(!presetTyped) $("presetName").value = presetDefault(p);
+  $("savePreset").disabled = !FUSION || busy || !$("presetName").value.trim();
+  $("savePreset").title = FUSION ? "Save as a tool preset in Fusion" : "Open this panel in Fusion to save presets";
+}
+function onSavePreset(){
+  const p = ops[idx], R = p && results[opKey(p)];
+  if(!R || !R.opt || !R.opt.ok || busy) return;
+  const b = R.opt.best, values = { n: b.n, vf: b.vf, ae: b.ae, ap: b.ap };
+  if(R.ramp && R.ramp.vf > 0){ values.rampVf = R.ramp.vf; values.rampN = R.ramp.n; }
+  const name = $("presetName").value.trim();
+  busy = true; renderApply(); renderPreset(); setStatus(""); setMsg("");
+  send("savePreset", { id: opKey(p), name, values, assign: $("presetAssign").checked, library: $("presetLib").checked }).then(r => {
+    busy = false;
+    if(!r || !r.ok){ renderApply(); renderPreset(); setMsg((r && r.reason) || "Couldn’t save the preset."); return; }
+    let s = `✓ Preset “${r.name}” ${r.created ? "saved" : "updated"}`;
+    const notes = [];
+    if(r.assigned === false) notes.push("Fusion didn’t let it be assigned to the operation; pick it in the operation’s Tool tab.");
+    if(r.library) notes.push(`Tool library: ${r.library}.`);
+    reread(s, notes.join(" "));
+  }, () => { busy = false; renderApply(); renderPreset(); setMsg("Couldn’t reach Fusion."); });
 }
 function onRevert(){
   if(busy) return;
@@ -973,6 +1016,8 @@ function init(){
   }));
   $("apply").addEventListener("click", onApply);
   $("revert").addEventListener("click", onRevert);
+  $("savePreset").addEventListener("click", onSavePreset);
+  $("presetName").addEventListener("input", () => { presetTyped = !!$("presetName").value.trim(); renderPreset(); });
 
   LIMIT_FIELDS.forEach(k => $(k).addEventListener("change", () => { $("lsel").value = ""; saveWorking(); renderCard(); invalidate(); }));
   $("usePow").addEventListener("change", () => { saveWorking(); invalidate(); });

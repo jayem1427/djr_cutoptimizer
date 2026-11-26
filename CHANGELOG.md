@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.0 — 2026-11-26
+
+**Tool presets.** A new *Tool preset* section under Results saves the optimized cut as a preset on the operation's tool: spindle speed, cutting feed, ramp spindle speed and ramp feed, stepover and stepdown. New operations with that tool can start from it. The name fills in from material and pass (for example "djr · Aluminium (wrought) · Rough") until you type your own, and saving under an existing name updates that preset. *Use it on this operation* (on by default) assigns it. *Also add it to my tool library* adds the same preset to that tool in your local and cloud tool libraries. The operation card now shows which preset an operation uses.
+
+**Parameter names verified against real Fusion data.** The `djr_dump_cam_params` output from a real document (Fusion 2706) is now in `docs/cam_params`, and a test runs on it. Several guesses were wrong:
+- **Finish passes couldn't set stock to leave.** The parameters are `stockToLeave` (radial), `verticalStockToLeave` (axial) and `useStockToLeave`, not `radialStockToLeave`/`axialStockToLeave`. Wall and floor finish Apply now writes them.
+- **Feeds written as expressions read 10× too high.** Fusion stores feeds in mm/min, not cm/min. This hit ramp and plunge feeds like `tool_feedPlunge`.
+- **Feeds written as `900mmpm` read 10× too high.** That unit wasn't recognised. `inpm` is now recognised too, and so are numbers with a trailing point (`16000.`, `62.in/min`).
+- **The ramp diameter wasn't found.** It's `helicalRampDiameter`. The ramp angle is stored in degrees, not radians. The helix ramp now uses the operation's real angle and diameter instead of assuming 2° and Ø<sub>tool</sub>.
+- **Single-pass 2D contours** reported their switched-off "multiple stepovers" value as the stepover, and 0 as the stepdown. Fields Fusion has switched off are now ignored, so the panel asks for the engagement or takes it from the roughing.
+
 ## v0.5.2 — 2026-11-25
 
 **Fixed: "Optimal Load … should not exceed 99% of the tool diameter."** With *Keep stepover* off, the optimizer could pick a stepover up to the full tool diameter. On an adaptive, Fusion refuses to generate when the optimal load plus the load deviation is over 99% of the diameter. The panel now reads the operation's load deviation and never suggests more than that allows: 0.99·D − deviation, or 0.99·D ÷ (1 + ratio) when the deviation is written as a fraction of the optimal load. If the deviation can't be read, it assumes 20% of the diameter. Apply also refuses to write an optimal load over the cap, so a stale panel can't cause it either.

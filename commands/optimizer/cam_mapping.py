@@ -31,31 +31,33 @@ TOOL_NAMES = {
     'helix':    ['tool_helixAngle'],
     'type':     ['tool_type'],
 }
-# Stock to leave, written for finishing passes. Also unverified: Apply reads every value
-# back after writing it and puts the operation back if anything doesn't match.
+# Stock to leave, written for finishing passes. Verified against a Fusion 2706 dump
+# (docs/cam_params): "Radial Stock to Leave" is stockToLeave, "Axial Stock to Leave" is
+# verticalStockToLeave, and the "Stock to Leave" checkbox is useStockToLeave.
 STOCK_NAMES = {
-    'radial': ['radialStockToLeave'],
-    'axial':  ['axialStockToLeave'],
+    'radial': ['stockToLeave'],
+    'axial':  ['verticalStockToLeave'],
 }
 # Adaptive clearing: Fusion refuses to generate when optimal load + load deviation is over
-# 99 % of the tool diameter. The deviation can be a fixed length or an expression of the
-# optimal load (e.g. "optimalLoad * 0.1"). Name unverified, like the others.
+# 99 % of the tool diameter. Verified: loadDeviation defaults to an expression of the optimal
+# load, "(optimalLoad<(tool_diameter-optimalLoad*0.20))?(optimalLoad*0.10):(...)", i.e. 10 %.
 LOAD_DEV_NAMES = ['loadDeviation']
 MAX_LOAD_FRACTION = 0.99
 # Used when the deviation can't be read: assume 20 % of the diameter, so the cap is 0.79 D.
 FALLBACK_DEV_FRACTION = 0.20
-# Helical ramp (entry) of adaptives and pockets. All UNVERIFIED like the names above; Apply
-# reads each value back and puts the operation back if one doesn't match.
+# Helical ramp (entry) of adaptives and pockets. Verified (Fusion 2706): rampType is 'helix',
+# 'profile', ...; rampAngle is stored in degrees; helicalRampDiameter is usually an
+# expression, max((D - 2 r) * 0.95, D * 0.25), so it's read from its internal value (cm).
 RAMP_NAMES = {
     'vf':    ['tool_feedRamp'],
     'n':     ['tool_rampSpindleSpeed'],
-    'angle': ['rampAngle', 'helicalRampAngle', 'rampingAngle'],
-    'dia':   ['rampDiameter', 'helicalRampDiameter', 'maximumRampDiameter', 'rampHelixDiameter'],
+    'angle': ['rampAngle'],
+    'dia':   ['helicalRampDiameter'],
 }
 RAMP_KIND = {'vf': 'feed', 'n': 'rpm', 'angle': 'deg', 'dia': 'len'}
-RAMP_TYPE = ['rampType', 'entryType']
-# The "Stock to leave" checkbox that enables the two values (a boolean parameter).
-STOCK_FLAG = ['stockToLeave', 'doStockToLeave', 'useStockToLeave']
+RAMP_TYPE = ['rampType']
+# The "Stock to Leave" checkbox that enables the two values (a boolean parameter).
+STOCK_FLAG = ['useStockToLeave']
 PASSES = ('rough', 'wall', 'floor')
 # Text fields shown on the operation card (not used in the math).
 TOOL_TEXT = {
@@ -82,7 +84,7 @@ def read_text(params: dict, names: list) -> Optional[str]:
     for name in names:
         if name not in params:
             continue
-        expr, internal = params[name]
+        expr, internal = params[name][:2]
         if isinstance(expr, str) and expr.strip():
             t = expr.strip().strip('\'"').strip()
             if t:
@@ -97,15 +99,16 @@ def read_text(params: dict, names: list) -> Optional[str]:
 KIND = {'n': 'rpm', 'vf': 'feed', 'fz': 'len', 'vc': 'speed', 'ae': 'len', 'ap': 'len',
         'D': 'len', 'fluteLen': 'len', 'stickout': 'len', 'helix': 'deg', 'z': 'count'}
 
-# Fusion API values are in internal units. Used only when the expression can't be
-# parsed (for example, when it references other parameters). Length: cm.
-# Feed and speed internal units are UNVERIFIED; confirm against the dump.
-INTERNAL_TO_CALC = {'len': 10.0, 'feed': 10.0, 'speed': 1.0, 'rpm': 1.0, 'deg': 180.0 / math.pi, 'count': 1.0}
+# Fusion API values are in internal units. Used only when the expression can't be parsed
+# (for example, when it references other parameters). Verified against a Fusion 2706 dump:
+# lengths in cm (optimalLoad "1 mm" -> 0.1), feeds in mm/min ("7220 mm/min" -> 7220.0),
+# angles in degrees (rampAngle "1.2deg" -> 1.2). Surface speed is unverified.
+INTERNAL_TO_CALC = {'len': 10.0, 'feed': 1.0, 'speed': 1.0, 'rpm': 1.0, 'deg': 1.0, 'count': 1.0}
 
 _UNIT = {
     'len':   {'mm': 1.0, 'cm': 10.0, 'm': 1000.0, 'in': 25.4, '"': 25.4, 'ft': 304.8},
-    'feed':  {'mm/min': 1.0, 'cm/min': 10.0, 'm/min': 1000.0, 'in/min': 25.4, 'ipm': 25.4, 'ft/min': 304.8,
-              'mm/s': 60.0, 'in/s': 1524.0},
+    'feed':  {'mm/min': 1.0, 'mmpm': 1.0, 'cm/min': 10.0, 'm/min': 1000.0, 'in/min': 25.4, 'inpm': 25.4,
+              'ipm': 25.4, 'ft/min': 304.8, 'mm/s': 60.0, 'in/s': 1524.0},
     'speed': {'m/min': 1.0, 'ft/min': 0.3048, 'sfm': 0.3048, 'mm/min': 0.001},
     'rpm':   {'rpm': 1.0},
     'deg':   {'deg': 1.0, '°': 1.0, 'rad': 180.0 / math.pi},
@@ -135,7 +138,8 @@ REFUSED = {
     'contour3d': '3D finishing isn’t covered.',
 }
 
-_NUM_UNIT = re.compile(r'^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*([^\d\s][^\s]*)?\s*$')
+# Fusion writes numbers like "16000." and "1.in/min", so a trailing point is allowed.
+_NUM_UNIT = re.compile(r'^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*([^\d\s.][^\s]*)?\s*$')
 
 
 def parse_quantity(expression: str, kind: str) -> Optional[float]:
@@ -159,7 +163,7 @@ def read_value(params: dict, names: list, kind: str) -> Optional[float]:
     for name in names:
         if name not in params:
             continue
-        expr, internal = params[name]
+        expr, internal = params[name][:2]
         v = parse_quantity(expr, kind)
         if v is None and isinstance(internal, (int, float)) and not isinstance(internal, bool):
             v = float(internal) * INTERNAL_TO_CALC.get(kind, 1.0)
@@ -216,9 +220,18 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
     if op.get('fz') is None and op.get('vf') and op.get('n') and tool.get('z'):
         op['fz'] = op['vf'] / (op['n'] * tool['z'])
 
-    missing = [k for k in ('D', 'z') if tool.get(k) is None] + [k for k in ('n', 'vf', 'ae', 'ap') if op.get(k) is None]
     # Which parameter each value came from, so Apply writes back to exactly that one.
     src = {k: found_name(op_params, OP_NAMES[k], KIND[k]) for k in ('n', 'vf', 'ae', 'ap')}
+    # A stepover or stepdown Fusion has switched off (a single-pass contour's maximumStepover,
+    # maximumStepdown with multiple depths off) isn't the cut's engagement, and 0 isn't one either:
+    # leave it unknown so the panel asks for it, and never write to it.
+    for k in ('ae', 'ap'):
+        name = src.get(k)
+        if name and (not editable(op_params, name) or not (op.get(k) or 0) > 0):
+            op[k], src[k] = None, None
+    if kind_or_reason == 'slot':
+        op['ae'] = tool['D']
+    missing = [k for k in ('D', 'z') if tool.get(k) is None] + [k for k in ('n', 'vf', 'ae', 'ap') if op.get(k) is None]
     if kind_or_reason == 'slot':
         src['ae'] = None                 # a slot's width is the tool; nothing to write
     if src.get('ae') == 'optimalLoad':
@@ -257,6 +270,12 @@ def max_optimal_load(op_params: dict, D: Optional[float], ae_now: Optional[float
         cap = top - dev
     cap = math.floor(cap * 1000 + 1e-6) / 1000
     return cap if cap > 0 else None
+
+
+def editable(params: dict, name: str) -> bool:
+    """False when Fusion has the field switched off (greyed out). Unknown counts as editable."""
+    row = params.get(name)
+    return not (row is not None and len(row) > 2 and row[2] is False)
 
 
 def found_name(params: dict, names: list, kind: str) -> Optional[str]:
@@ -345,6 +364,42 @@ def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dic
     return writes
 
 
+# Tool preset parameters (verified in the dump's operation.toolPreset.parameters).
+PRESET_NAMES = {'n': 'tool_spindleSpeed', 'vf': 'tool_feedCutting', 'rampN': 'tool_rampSpindleSpeed',
+                'rampVf': 'tool_feedRamp', 'ae': 'tool_stepover', 'ap': 'tool_stepdown'}
+
+
+def preset_writes(values: dict) -> list:
+    """What a tool preset gets from an optimized cut: [(name, expression, kind, target)].
+
+    values: {n, vf, rampN?, rampVf?, ae?, ap?} (rpm, mm/min, mm). Speed and feeds round down,
+    like Apply. Raises ValueError without a valid spindle speed and feed."""
+    n, vf = _num(values.get('n')), _num(values.get('vf'))
+    if not (n and n > 0 and vf and vf > 0):
+        raise ValueError('No valid spindle speed and feed to save.')
+    out = []
+    for k, kind, unit in (('n', 'rpm', 'rpm'), ('vf', 'feed', 'mm/min'), ('rampN', 'rpm', 'rpm'),
+                          ('rampVf', 'feed', 'mm/min'), ('ae', 'len', 'mm'), ('ap', 'len', 'mm')):
+        v = _num(values.get(k))
+        if not (v and v > 0):
+            continue
+        if kind == 'len':
+            out.append((PRESET_NAMES[k], f'{_fmt(v)} {unit}', kind, round(v, 4)))
+        else:
+            v = math.floor(v)
+            out.append((PRESET_NAMES[k], f'{v} {unit}', kind, float(v)))
+    return out
+
+
+def tool_guid(tool_json: Optional[str]) -> Optional[str]:
+    """The tool's guid from Tool.toJson(), used to find the same tool in a library."""
+    try:
+        g = json.loads(tool_json).get('guid')
+    except Exception:
+        return None
+    return str(g) if g else None
+
+
 _TOL = {'rpm': 0.5, 'feed': 0.5, 'len': 1e-4}
 
 
@@ -359,7 +414,10 @@ def write_matches(kind: str, target, expression, internal) -> bool:
 
 
 def params_to_dict(params) -> dict:
-    """Turn a Fusion CAMParameters collection into name -> (expression, internal_value)."""
+    """Turn a Fusion CAMParameters collection into name -> (expression, internal_value, editable).
+
+    editable is False for fields Fusion has switched off (greyed out in the dialog), e.g. a 2D
+    contour's maximumStepover when multiple stepovers are off."""
     def _s(fn, default=None):
         try:
             return fn()
@@ -373,5 +431,6 @@ def params_to_dict(params) -> dict:
         if not name:
             continue
         val = _s(lambda: p.value)
-        out[name] = (_s(lambda: p.expression, ''), _s(lambda: val.value) if val is not None else None)
+        out[name] = (_s(lambda: p.expression, ''), _s(lambda: val.value) if val is not None else None,
+                     _s(lambda: p.isEditable, True) is not False)
     return out
