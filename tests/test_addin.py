@@ -186,6 +186,25 @@ def _fake_op(strategy='adaptive2d', tool_rows=None, op_rows=None, name='Adaptive
             ('optimalLoad', '1.67 mm', 0.167), ('maximumStepdown', '15 mm', 1.5)]))
 
 
+_PRESET_ROWS = [('tool_spindleSpeed', '12500.', 12500.0), ('tool_feedCutting', '62.in/min', 1574.8),
+                ('tool_rampSpindleSpeed', '22000.', 22000.0), ('tool_feedRamp', 'tool_feedPlunge', 203.2),
+                ('tool_stepover', '0.025in', 0.0635), ('tool_stepdown', '0.03in', 0.0762)]
+
+
+class _Presets:
+    """Tool.presets: add() copies the tool's values into a new preset, like Fusion."""
+    def __init__(self):
+        self.items = []
+
+    def add(self):
+        pr = types.SimpleNamespace(name='', parameters=_Params(list(_PRESET_ROWS)))
+        self.items.append(pr)
+        return pr
+
+    def itemsByName(self, name):
+        return [p for p in self.items if p.name.lower() == name.lower()]
+
+
 def _cam_doc():
     cam = types.SimpleNamespace(is_cam=True, generated=[])
     cam.generateToolpath = lambda coll: cam.generated.extend(coll)
@@ -196,7 +215,7 @@ def _cam_doc():
 _FINISH_ROWS = [
     ('tool_spindleSpeed', '18000 rpm', 18000), ('tool_feedCutting', '1500 mm/min', 150.0),
     ('optimalLoad', '0.5 mm', 0.05), ('maximumStepdown', '10 mm', 1.0),
-    ('stockToLeave', 'false', False), ('radialStockToLeave', '0.3 mm', 0.03), ('axialStockToLeave', '0.2 mm', 0.02)]
+    ('useStockToLeave', 'false', False), ('stockToLeave', '0.3 mm', 0.03), ('verticalStockToLeave', '0.2 mm', 0.02)]
 
 
 # ----------------------------------------------------------------------- tests
@@ -216,8 +235,19 @@ class ParseQuantity(unittest.TestCase):
         self.assertIsNone(cam_mapping.parse_quantity('12', 'len'))       # length without a unit is ambiguous
 
     def test_internal_fallback(self):
+        # feeds are stored in mm/min, lengths in cm (verified against a Fusion dump)
         params = {'tool_feedPlunge': ('tool_feedCutting * 0.5', 300.0)}
-        self.assertAlmostEqual(cam_mapping.read_value(params, ['tool_feedPlunge'], 'feed'), 3000.0)
+        self.assertAlmostEqual(cam_mapping.read_value(params, ['tool_feedPlunge'], 'feed'), 300.0)
+        params = {'helicalRampDiameter': ('Math.max((tool_diameter - 2 * tool_cornerRadius) * 0.95; 1)', 0.904875)}
+        self.assertAlmostEqual(cam_mapping.read_value(params, ['helicalRampDiameter'], 'len'), 9.04875)
+
+    def test_fusion_number_formats(self):
+        P = cam_mapping.parse_quantity
+        self.assertAlmostEqual(P('16000.', 'rpm'), 16000)
+        self.assertAlmostEqual(P('900mmpm', 'feed'), 900)
+        self.assertAlmostEqual(P('62.in/min', 'feed'), 1574.8)
+        self.assertAlmostEqual(P('1.2deg', 'deg'), 1.2)
+        self.assertAlmostEqual(P('0.375in', 'len'), 9.525)
 
 
 class BuildPayload(unittest.TestCase):
@@ -281,7 +311,7 @@ class BuildPayload(unittest.TestCase):
         rows = [('tool_spindleSpeed', '24000 rpm', 24000), ('tool_feedCutting', '6000 mm/min', 600.0),
                 ('optimalLoad', '1 mm', 0.1), ('maximumStepdown', '15 mm', 1.5),
                 ('tool_feedRamp', '300 mm/min', 30.0), ('tool_rampSpindleSpeed', '24000 rpm', 24000),
-                ('rampAngle', '2 deg', 0.0349), ('rampDiameter', '8 mm', 0.8), ('rampType', "'helix'", 'helix')]
+                ('rampAngle', '2deg', 2.0), ('helicalRampDiameter', '8 mm', 0.8), ('rampType', "'helix'", 'helix')]
         op = _fake_op('adaptive', op_rows=rows)
         p = cam_mapping.build_payload('adaptive', cam_mapping.params_to_dict(op.parameters),
                                       cam_mapping.params_to_dict(op.tool.parameters))
@@ -302,6 +332,60 @@ class BuildPayload(unittest.TestCase):
         p = cam_mapping.build_payload('adaptive2d', {}, {})
         self.assertFalse(p['ok'])
         self.assertIn('diameter', p['reason'])
+
+
+class RealFusionDump(unittest.TestCase):
+    """Operations from a real djr_dump_cam_params run (Fusion 2706, the owner's Grid Vacuum
+    Plate document), trimmed to the parameters the mapping uses. Guards the verified names."""
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(os.path.dirname(__file__), 'fixtures', 'fusion_dump_ops.json')
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        cls.ops = {}
+        for o in data['operations']:
+            rows = lambda r: {n: (e, v, ed) for n, e, v, ed in r}
+            cls.ops[o['name']] = cam_mapping.build_payload(o['strategy'], rows(o['operation']), rows(o['tool']), o['name'])
+
+    def test_3d_adaptive(self):
+        p = self.ops['R2 Rough - 3D Adaptive #12']
+        self.assertTrue(p['ok'])
+        self.assertAlmostEqual(p['tool']['D'], 9.525)
+        self.assertEqual(p['tool']['z'], 3)
+        self.assertAlmostEqual(p['op']['n'], 24000)
+        self.assertAlmostEqual(p['op']['vf'], 7220)
+        self.assertAlmostEqual(p['op']['ae'], 1.0)
+        self.assertAlmostEqual(p['op']['ap'], 9.9241)
+        self.assertAlmostEqual(p['op']['aeMax'], 8.572)                       # 0.99 D / 1.1
+        self.assertEqual(p['src'], {'n': 'tool_spindleSpeed', 'vf': 'tool_feedCutting', 'ae': 'optimalLoad', 'ap': 'maximumStepdown'})
+        self.assertEqual(p['ramp']['type'], 'helix')
+        self.assertAlmostEqual(p['ramp']['angle'], 1.2)
+        self.assertAlmostEqual(p['ramp']['dia'], 9.04875)
+        self.assertAlmostEqual(p['ramp']['vf'], 275, places=3)                # "10.8268in/min"
+        self.assertAlmostEqual(p['ramp']['n'], 16000)                         # "16000."
+        self.assertEqual(p['stockSrc'], {'radial': 'stockToLeave', 'axial': 'verticalStockToLeave', 'flag': 'useStockToLeave'})
+        self.assertAlmostEqual(p['stock']['radial'], 0.25)
+
+    def test_contour_engagement_is_unknown(self):
+        # maximumStepover / maximumStepdown are switched off on a single-pass contour
+        p = self.ops['2D Contour7']
+        self.assertIsNone(p['op']['ae'])
+        self.assertIsNone(p['src']['ae'])
+        self.assertIsNone(p['op']['ap'])
+        self.assertAlmostEqual(p['op']['vf'], 1574.8)                         # "62.in/min"
+        self.assertAlmostEqual(p['op']['n'], 12500)                           # "12500."
+
+    def test_pocket_and_face(self):
+        p = self.ops['Rough Channels - 2D Pocket #1']
+        self.assertAlmostEqual(p['op']['ae'], 1.8)                            # tool_diameter * 0.6
+        self.assertAlmostEqual(p['op']['vf'], 1800)
+        self.assertEqual(p['ramp']['type'], 'profile')
+        f = self.ops['Face Rough - BAP10 #14']
+        self.assertAlmostEqual(f['op']['vf'], 1600)                           # "1600mmpm"
+        self.assertEqual(f['src']['ae'], 'stepover')
+
+    def test_bore_refused(self):
+        self.assertFalse(self.ops['Stud Seats 16H6 - Bore #12']['ok'])
 
 
 class ReadSelection(unittest.TestCase):
@@ -411,7 +495,7 @@ class ReadOps(unittest.TestCase):
 
 class PlanWrites(unittest.TestCase):
     SRC = {'n': 'tool_spindleSpeed', 'vf': 'tool_feedCutting', 'ae': 'optimalLoad', 'ap': 'maximumStepdown'}
-    STOCK = {'radial': 'radialStockToLeave', 'axial': 'axialStockToLeave', 'flag': 'stockToLeave'}
+    STOCK = {'radial': 'stockToLeave', 'axial': 'verticalStockToLeave', 'flag': 'useStockToLeave'}
 
     def test_rough_writes_rpm_and_feed_only(self):
         w = cam_mapping.plan_writes(self.SRC, {'n': 17999.7, 'vf': 3456.9, 'pass': 'rough'}, 0.05, self.STOCK)
@@ -425,15 +509,15 @@ class PlanWrites(unittest.TestCase):
 
     def test_wall_finish_leaves_clearance_on_floor(self):
         w = {n: e for n, e, _, _ in cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'wall'}, 0.05, self.STOCK)}
-        self.assertEqual(w['radialStockToLeave'], '0 mm')
-        self.assertEqual(w['axialStockToLeave'], '0.05 mm')
-        self.assertEqual(w['stockToLeave'], 'true')
+        self.assertEqual(w['stockToLeave'], '0 mm')
+        self.assertEqual(w['verticalStockToLeave'], '0.05 mm')
+        self.assertEqual(w['useStockToLeave'], 'true')
         self.assertNotIn('optimalLoad', w)                  # finish passes never change the engagement
 
     def test_floor_finish_leaves_clearance_on_wall(self):
         w = {n: e for n, e, _, _ in cam_mapping.plan_writes(self.SRC, {'n': 18000, 'vf': 2000, 'pass': 'floor'}, 0.05, self.STOCK)}
-        self.assertEqual(w['radialStockToLeave'], '0.05 mm')
-        self.assertEqual(w['axialStockToLeave'], '0 mm')
+        self.assertEqual(w['stockToLeave'], '0.05 mm')
+        self.assertEqual(w['verticalStockToLeave'], '0 mm')
 
     def test_refuses_rather_than_half_apply(self):
         P = cam_mapping.plan_writes
@@ -496,7 +580,7 @@ class Apply(unittest.TestCase):
         p = self._select(_fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall'))['Wall']
         self.assertEqual(p['src']['ae'], 'optimalLoad')
         self.assertAlmostEqual(p['stock']['radial'], 0.3)
-        self.assertEqual(p['stockSrc'], {'radial': 'radialStockToLeave', 'axial': 'axialStockToLeave', 'flag': 'stockToLeave'})
+        self.assertEqual(p['stockSrc'], {'radial': 'stockToLeave', 'axial': 'verticalStockToLeave', 'flag': 'useStockToLeave'})
         json.dumps(p)
 
     def test_apply_wall_finish_and_revert(self):
@@ -510,16 +594,16 @@ class Apply(unittest.TestCase):
         P = op.parameters
         self.assertEqual(P.expr('tool_spindleSpeed'), '20000 rpm')
         self.assertEqual(P.expr('tool_feedCutting'), '2400 mm/min')
-        self.assertEqual(P.expr('radialStockToLeave'), '0 mm')
-        self.assertEqual(P.expr('axialStockToLeave'), '0.05 mm')
-        self.assertIs(P.itemByName('stockToLeave').value.value, True)
+        self.assertEqual(P.expr('stockToLeave'), '0 mm')
+        self.assertEqual(P.expr('verticalStockToLeave'), '0.05 mm')
+        self.assertIs(P.itemByName('useStockToLeave').value.value, True)
         self.assertEqual(P.expr('optimalLoad'), '0.5 mm')        # engagement untouched
 
         rv = OptimizerCommand.revert()
         self.assertTrue(rv['ok'], rv)
         self.assertEqual(P.expr('tool_spindleSpeed'), '18000 rpm')
-        self.assertEqual(P.expr('radialStockToLeave'), '0.3 mm')
-        self.assertIs(P.itemByName('stockToLeave').value.value, False)
+        self.assertEqual(P.expr('stockToLeave'), '0.3 mm')
+        self.assertIs(P.itemByName('useStockToLeave').value.value, False)
         self.assertFalse(OptimizerCommand.revert()['ok'])        # nothing left to revert
 
     def test_apply_refuses_optimal_load_over_99_percent(self):
@@ -548,17 +632,52 @@ class Apply(unittest.TestCase):
         OptimizerCommand.revert()
         self.assertEqual(op.parameters.expr('tool_feedRamp'), '300 mm/min')
 
+    def _preset_op(self):
+        op = _fake_op('adaptive', name='Adaptive')
+        op.tool.presets = _Presets()
+        op.toolPreset = None
+        return op, self._select(op)['Adaptive']
+
+    def test_save_preset_and_assign(self):
+        op, p = self._preset_op()
+        r = OptimizerCommand.save_preset({'id': p['id'], 'name': 'djr 6061 rough', 'assign': True,
+                                          'values': {'n': 24000, 'vf': 6213.7, 'rampN': 24000, 'rampVf': 2504.5, 'ae': 0.4827}})
+        self.assertTrue(r['ok'], r)
+        self.assertTrue(r['created'])
+        self.assertTrue(r['assigned'])
+        pr = op.tool.presets.items[0]
+        self.assertEqual(pr.name, 'djr 6061 rough')
+        self.assertEqual(pr.parameters.expr('tool_feedCutting'), '6213 mm/min')
+        self.assertEqual(pr.parameters.expr('tool_feedRamp'), '2504 mm/min')
+        self.assertEqual(pr.parameters.expr('tool_stepover'), '0.4827 mm')
+        self.assertEqual(pr.parameters.expr('tool_stepdown'), '0.03in')            # not given: untouched
+        self.assertIs(op.toolPreset, pr)
+        # saving again under the same name updates it instead of adding another
+        r = OptimizerCommand.save_preset({'id': p['id'], 'name': 'DJR 6061 rough', 'values': {'n': 20000, 'vf': 5000}})
+        self.assertTrue(r['ok'], r)
+        self.assertEqual(len(op.tool.presets.items), 1)
+        self.assertEqual(pr.parameters.expr('tool_spindleSpeed'), '20000 rpm')
+
+    def test_save_preset_refusals(self):
+        op, p = self._preset_op()
+        self.assertFalse(OptimizerCommand.save_preset({'id': p['id'], 'name': '', 'values': {'n': 1, 'vf': 1}})['ok'])
+        self.assertFalse(OptimizerCommand.save_preset({'id': p['id'], 'name': 'x', 'values': {'n': 0, 'vf': 1}})['ok'])
+        self.assertFalse(OptimizerCommand.save_preset({'id': 'nope', 'name': 'x', 'values': {'n': 1, 'vf': 1}})['ok'])
+        del op.tool.presets
+        r = OptimizerCommand.save_preset({'id': p['id'], 'name': 'x', 'values': {'n': 1, 'vf': 1}})
+        self.assertIn('presets', r['reason'])
+
     def test_failed_write_puts_the_op_back(self):
         op = _fake_op('contour2d', op_rows=list(_FINISH_ROWS), name='Wall')
         p = self._select(op)['Wall']
         _Param.refuse = {'0.05 mm'}                                  # Fusion refuses the last write
         r = OptimizerCommand.apply([{'id': p['id'], 'n': 20000, 'vf': 2400, 'pass': 'wall'}], 0.05)
         self.assertFalse(r['ok'])
-        self.assertIn('Fusion refused axialStockToLeave', r['results'][0]['reason'])
+        self.assertIn('Fusion refused verticalStockToLeave', r['results'][0]['reason'])
         self.assertIn('Put back', r['results'][0]['reason'])
         self.assertEqual(op.parameters.expr('tool_spindleSpeed'), '18000 rpm')
-        self.assertEqual(op.parameters.expr('radialStockToLeave'), '0.3 mm')
-        self.assertIs(op.parameters.itemByName('stockToLeave').value.value, False)
+        self.assertEqual(op.parameters.expr('stockToLeave'), '0.3 mm')
+        self.assertIs(op.parameters.itemByName('useStockToLeave').value.value, False)
         self.assertEqual(_State.document.cam.generated, [])
 
     def test_locked_parameter_is_reported(self):
@@ -596,11 +715,11 @@ class Apply(unittest.TestCase):
                                      data=json.dumps({'items': [{'id': p['id'], 'n': 19000, 'vf': 2000, 'pass': 'floor'}], 'clearance': 0.05}))
         OptimizerCommand.onHTML(args)
         self.assertTrue(json.loads(args.returnData)['ok'])
-        self.assertEqual(op.parameters.expr('radialStockToLeave'), '0.05 mm')
+        self.assertEqual(op.parameters.expr('stockToLeave'), '0.05 mm')
         args = types.SimpleNamespace(action='revert', returnData='', data='')
         OptimizerCommand.onHTML(args)
         self.assertTrue(json.loads(args.returnData)['ok'])
-        self.assertEqual(op.parameters.expr('radialStockToLeave'), '0.3 mm')
+        self.assertEqual(op.parameters.expr('stockToLeave'), '0.3 mm')
 
 
 class Profiles(unittest.TestCase):

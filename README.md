@@ -6,7 +6,7 @@ Click an operation in the Manufacture browser, and a compact panel shows the cur
 
 **No Fusion?** The same model runs in your browser as a standalone calculator: **[jayem1427.github.io/cutcalculator](https://jayem1427.github.io/cutcalculator/)**. Enter a tool and a cut, set your limits, and press Optimize.
 
-> **Status: v0.5.2. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
+> **Status: v0.6. Apply works in Fusion on a roughing operation** (checked on Windows). Finish passes, Revert and the other operation types are tested against a fake Fusion API only, and some CAM parameter names aren't verified on real operations yet. Apply reads every value back and puts an operation back if anything doesn't match, and **Revert** undoes the last Apply. Try it on a copy of a document first. See [Status](#status).
 
 | One operation | All selected |
 |---|---|
@@ -49,6 +49,15 @@ Tools and geometry are still assigned by hand in Fusion; the add-in only sets fe
 - **Defaults.** A contour starts as a wall finish. An operation named with "rough", "floor", "wall" or "finish" follows its name. Everything else starts as rough. The choice is remembered per operation.
 - **Finish engagement.** The roughing stock comes from the *selected* rough operations in the same setup, so select the roughing along with the finishing. If none is selected, the operation's own stepover/stepdown is used; type the real engagement under *Current* if that's wrong.
 - The 0.05 mm is **Finish clearance**, and 0.01 mm is **Finish deflection**, both under *More limits*.
+
+### Tool presets
+
+Under **Tool preset** (one operation at a time), **Save** stores the optimized cut as a preset on the operation's tool: spindle speed, cutting feed, ramp spindle speed and ramp feed, stepover and stepdown. The name fills in from the material and pass until you type your own. Saving under a name that already exists updates that preset.
+
+- **Use it on this operation** (on by default) makes the operation use the new preset.
+- **Also add it to my tool library** adds the same preset to that tool in your local and cloud tool libraries, matched by the tool's id, so every new operation with that tool can start from it. A tool that only exists in the document is left alone, and the panel says so.
+
+The operation card shows which preset an operation uses.
 
 ### What Apply changes
 
@@ -144,17 +153,17 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 
 | | |
 |---|---|
-| Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3), and the v0.5 panel shows a tool's flute count from the tool library. Reading a real 3D Adaptive roughing operation, and Apply on it in v0.4.1: spindle speed, feed and stepover were written, read back and the toolpath regenerated. That confirms `tool_spindleSpeed`, `tool_feedCutting` and `optimalLoad`. |
-| Verified by tests | The model and optimizer against the Sandvik and HSM reference cuts (15 Node tests). 42 Python tests against a fake Fusion API: reading operations, expanding setups, skipping unsupported operations, storing the material, limit profiles, and no crash with no document, no CAM data or nothing selected. For Apply, they also cover the write plan for each pass type, read-back checks, rollback when Fusion refuses a value or a parameter is locked, partial bulk applies, and Revert. The panel itself (pass defaults, finish engagement, the two-click Apply, the payload sent to Fusion, Revert, bulk) is driven by a fake Fusion bridge in headless Chrome. |
-| Not verified yet | Wall and floor finish passes (stock to leave), Revert, Apply on a pocket, contour or slot, bulk Apply on several operations, and the v0.5.1 panel background fix (#6). |
-| Unverified names | The other CAM parameter names in `commands/optimizer/cam_mapping.py`: `maximumStepdown` (read, not yet written), `loadDeviation`, `tool_feedRamp`, `tool_rampSpindleSpeed`, `rampAngle`, `rampDiameter`, `rampType`, `radialStockToLeave`, `axialStockToLeave`, `stockToLeave`, `tool_bodyLength`, …. A wrong name makes Apply refuse that operation with a message; it doesn't write somewhere else. |
+| Checked in Fusion (Windows) | The toolbar button and the panel load (v0.3), and the v0.5 panel shows a tool's flute count from the tool library. Reading a real 3D Adaptive roughing operation, and Apply on it in v0.4.1: spindle speed, feed and stepover were written, read back and the toolpath regenerated. |
+| Parameter names | **Verified** against a dump of 28 real operations (Fusion 2706): adaptive, 2D adaptive, contour, pocket, face, bore, chamfer. See [docs/cam_params](docs/cam_params/README.md) for every name and unit the add-in uses. No slot operation has been dumped yet. |
+| Verified by tests | The model and optimizer against the Sandvik and HSM reference cuts (15 Node tests). 58 Python tests, including payloads built from the real dump, against a fake Fusion API: reading operations, expanding setups, skipping unsupported operations, storing the material, limit profiles, and no crash with no document, no CAM data or nothing selected. For Apply, they also cover the write plan for each pass type, read-back checks, rollback when Fusion refuses a value or a parameter is locked, partial bulk applies, and Revert. The panel itself (pass defaults, finish engagement, the two-click Apply, the payload sent to Fusion, Revert, bulk) is driven by a fake Fusion bridge in headless Chrome. |
+| Not run in Fusion yet | Writing (as opposed to reading) the finish stock, ramp feed and ramp rpm; tool presets (the API calls are from Autodesk's reference: `Tool.presets.add`, `DocumentToolLibrary.update`, `Operation.toolPreset`, `ToolLibraries.updateToolLibrary`); Revert; bulk Apply; the v0.5.1 panel background fix (#6). Every write is read back, and an operation that doesn't match is put back as it was. |
 
-**Help verify the parameter names:** run the `djr_dump_cam_params` script from the release (Scripts tab → **+** → the unzipped folder → **Run**). Select an adaptive, a 2D contour (with stock to leave ticked), a 2D pocket and a slot first. Then commit its output to `docs/cam_params/`.
+**After a Fusion update, or for a strategy not dumped yet:** run the `djr_dump_cam_params` script from the release (Scripts tab → **+** → the unzipped folder → **Run**) and add its output to `docs/cam_params/`.
 
 ## Roadmap
 
-- **Next.** Verify the parameter names against a real dump. Optionally scale the ramp and plunge feeds with the cutting feed.
-- **Later.** Assign tools and geometry automatically. "Save as preset" into the tool library, and a hook into [djr_batchpost](https://github.com/jayem1427/djr_batchpost) to optimize and then post.
+- **Next.** Calibrate the model against spindle-current logs; scale plunge and lead-in feeds; show cycle time before and after.
+- **Later.** Assign tools and geometry automatically, and a hook into [djr_batchpost](https://github.com/jayem1427/djr_batchpost) to optimize and then post.
 
 ## Development
 
