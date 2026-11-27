@@ -8,4 +8,4 @@ DEBUG = False
 ADDIN_NAME = os.path.basename(os.path.dirname(__file__))
 COMPANY_NAME = 'DJR'
 
-PLUGIN_VERSION = '0.6.0'
+PLUGIN_VERSION = '0.7.0'

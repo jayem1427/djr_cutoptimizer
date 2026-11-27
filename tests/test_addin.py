@@ -315,7 +315,8 @@ class BuildPayload(unittest.TestCase):
         op = _fake_op('adaptive', op_rows=rows)
         p = cam_mapping.build_payload('adaptive', cam_mapping.params_to_dict(op.parameters),
                                       cam_mapping.params_to_dict(op.tool.parameters))
-        self.assertEqual(p['rampSrc'], {'vf': 'tool_feedRamp', 'n': 'tool_rampSpindleSpeed'})
+        self.assertEqual(p['rampSrc'], {'vf': 'tool_feedRamp', 'n': 'tool_rampSpindleSpeed', 'angle': 'rampAngle'})
+        self.assertIsNone(p['ramp']['minDia'])
         self.assertAlmostEqual(p['ramp']['vf'], 300)
         self.assertAlmostEqual(p['ramp']['angle'], 2)
         self.assertAlmostEqual(p['ramp']['dia'], 8)
@@ -361,6 +362,8 @@ class RealFusionDump(unittest.TestCase):
         self.assertEqual(p['ramp']['type'], 'helix')
         self.assertAlmostEqual(p['ramp']['angle'], 1.2)
         self.assertAlmostEqual(p['ramp']['dia'], 9.04875)
+        self.assertAlmostEqual(p['ramp']['minDia'], 4.7625)                   # Fusion may shrink the helix to this
+        self.assertEqual(p['rampSrc']['angle'], 'rampAngle')
         self.assertAlmostEqual(p['ramp']['vf'], 275, places=3)                # "10.8268in/min"
         self.assertAlmostEqual(p['ramp']['n'], 16000)                         # "16000."
         self.assertEqual(p['stockSrc'], {'radial': 'stockToLeave', 'axial': 'verticalStockToLeave', 'flag': 'useStockToLeave'})
@@ -552,6 +555,31 @@ class PlanWrites(unittest.TestCase):
         with self.assertRaises(ValueError):
             cam_mapping.plan_writes(self.SRC, {'n': 24000, 'vf': 6000, 'rampVf': 0}, 0.05, None, None, rs)
 
+    def test_ramp_angle(self):
+        rs = {'vf': 'tool_feedRamp', 'n': 'tool_rampSpindleSpeed', 'angle': 'rampAngle'}
+        w = cam_mapping.plan_writes(self.SRC, {'n': 12000, 'vf': 2600, 'rampVf': 900, 'rampAngle': 3}, 0.05,
+                                    None, None, rs)
+        self.assertIn(('rampAngle', '3 deg', 'deg', 3), w)
+        # no angle parameter (or greyed out): the rest is still written
+        w = cam_mapping.plan_writes(self.SRC, {'n': 12000, 'vf': 2600, 'rampAngle': 3}, 0.05, None, None,
+                                    {'vf': 'tool_feedRamp'})
+        self.assertEqual(len(w), 2)
+        for bad in (0, -1, 16, 'x'):
+            with self.assertRaises(ValueError):
+                cam_mapping.plan_writes(self.SRC, {'n': 12000, 'vf': 2600, 'rampAngle': bad}, 0.05, None, None, rs)
+        self.assertTrue(cam_mapping.write_matches('deg', 3, '3 deg', 3.0))
+        self.assertFalse(cam_mapping.write_matches('deg', 3, '1.2deg', 1.2))
+
+    def test_ramp_angle_greyed_out(self):
+        rows = [('tool_spindleSpeed', '24000 rpm', 24000), ('tool_feedCutting', '6000 mm/min', 600.0),
+                ('optimalLoad', '1 mm', 0.1), ('maximumStepdown', '15 mm', 1.5),
+                ('tool_feedRamp', '300 mm/min', 30.0), ('rampAngle', '2deg', 2.0, False)]
+        op = _fake_op('adaptive', op_rows=rows)
+        p = cam_mapping.build_payload('adaptive', cam_mapping.params_to_dict(op.parameters),
+                                      cam_mapping.params_to_dict(op.tool.parameters))
+        self.assertIsNone(p['rampSrc']['angle'])
+        self.assertAlmostEqual(p['ramp']['angle'], 2)
+
     def test_write_matches(self):
         M = cam_mapping.write_matches
         self.assertTrue(M('rpm', 18000, '18000 rpm', 18000))
@@ -621,16 +649,19 @@ class Apply(unittest.TestCase):
     def test_apply_writes_ramp_feed(self):
         rows = [('tool_spindleSpeed', '20000 rpm', 20000), ('tool_feedCutting', '3000 mm/min', 300.0),
                 ('optimalLoad', '1 mm', 0.1), ('maximumStepdown', '15 mm', 1.5),
-                ('tool_feedRamp', '300 mm/min', 30.0), ('tool_rampSpindleSpeed', '18000 rpm', 18000)]
+                ('tool_feedRamp', '300 mm/min', 30.0), ('tool_rampSpindleSpeed', '18000 rpm', 18000),
+                ('rampAngle', '2deg', 2.0)]
         op = _fake_op('adaptive', op_rows=rows, name='Adaptive')
         p = self._select(op)['Adaptive']
         r = OptimizerCommand.apply([{'id': p['id'], 'n': 24000, 'vf': 6000, 'pass': 'rough',
-                                     'rampVf': 2500.7, 'rampN': 24000}], 0.05)
+                                     'rampVf': 2500.7, 'rampN': 24000, 'rampAngle': 3}], 0.05)
         self.assertTrue(r['ok'], r)
         self.assertEqual(op.parameters.expr('tool_feedRamp'), '2500 mm/min')
+        self.assertEqual(op.parameters.expr('rampAngle'), '3 deg')
         self.assertEqual(op.parameters.expr('tool_rampSpindleSpeed'), '24000 rpm')
         OptimizerCommand.revert()
         self.assertEqual(op.parameters.expr('tool_feedRamp'), '300 mm/min')
+        self.assertEqual(op.parameters.expr('rampAngle'), '2deg')
 
     def _preset_op(self):
         op = _fake_op('adaptive', name='Adaptive')

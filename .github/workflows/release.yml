@@ -41,7 +41,7 @@ jobs:
           node-version: "22"
       - run: pip install pytest
       - run: python -m pytest
-      - run: node --test tests/web_optimizer.test.js
+      - run: node --test tests/web_optimizer.test.js tests/web_ramp.test.js
       - name: Build zips
         run: python tools/build_release.py --tag "${TAG}"
       - name: Publish GitHub release

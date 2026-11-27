@@ -53,9 +53,11 @@ RAMP_NAMES = {
     'n':     ['tool_rampSpindleSpeed'],
     'angle': ['rampAngle'],
     'dia':   ['helicalRampDiameter'],
+    'minDia': ['minimumRampDiameter'],
 }
-RAMP_KIND = {'vf': 'feed', 'n': 'rpm', 'angle': 'deg', 'dia': 'len'}
+RAMP_KIND = {'vf': 'feed', 'n': 'rpm', 'angle': 'deg', 'dia': 'len', 'minDia': 'len'}
 RAMP_TYPE = ['rampType']
+MAX_RAMP_ANGLE = 15.0               # degrees; matches RampPlan.ANGLE_MAX in web/ramp.js
 # The "Stock to Leave" checkbox that enables the two values (a boolean parameter).
 STOCK_FLAG = ['useStockToLeave']
 PASSES = ('rough', 'wall', 'floor')
@@ -238,7 +240,9 @@ def build_payload(strategy: str, op_params: dict, tool_params: dict, op_name: st
         op['aeMax'] = max_optimal_load(op_params, tool['D'], op.get('ae'))
     ramp = {k: read_value(op_params, names, RAMP_KIND[k]) for k, names in RAMP_NAMES.items()}
     ramp['type'] = read_text(op_params, RAMP_TYPE)
-    ramp_src = {k: found_name(op_params, RAMP_NAMES[k], RAMP_KIND[k]) for k in ('vf', 'n')}
+    ramp_src = {k: found_name(op_params, RAMP_NAMES[k], RAMP_KIND[k]) for k in ('vf', 'n', 'angle')}
+    if ramp_src['angle'] and not editable(op_params, ramp_src['angle']):
+        ramp_src['angle'] = None         # greyed out in Fusion: don't offer to change it
     stock = {k: read_value(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
     stock_src = {k: found_name(op_params, names, 'len') for k, names in STOCK_NAMES.items()}
     stock_src['flag'] = next((n for n in STOCK_FLAG if n in op_params and isinstance(op_params[n][1], bool)), None)
@@ -304,8 +308,8 @@ def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dic
 
     item: {n, vf, pass, ae?, ap?} from the panel (rpm, mm/min, mm). ae/ap are written only
     when given; ae_max caps an adaptive's optimal load (see max_optimal_load). rampVf/rampN
-    (helical ramp feed and spindle speed) are written when given and the operation has those
-    parameters; an op without them still gets its cutting feeds. Finishing passes also set stock to leave: a wall finish leaves `clearance`
+    (helical ramp feed and spindle speed) and rampAngle (degrees, 0-15) are written when given
+    and the operation has those parameters; an op without them still gets its cutting feeds. Finishing passes also set stock to leave: a wall finish leaves `clearance`
     on the floor (axial) and none on the wall; a floor finish the other way round.
     Raises ValueError when something needed is missing, so the op is skipped as a whole:
     half-applied feeds and speeds are worse than none.
@@ -344,6 +348,14 @@ def plan_writes(src: dict, item: dict, clearance: float, stock_src: Optional[dic
         if name:
             v = math.floor(v)
             writes.append((name, f'{v} {unit}', kind, float(v)))
+    if item.get('rampAngle') is not None:
+        a = _num(item['rampAngle'])
+        if not (a and 0 < a <= MAX_RAMP_ANGLE):
+            raise ValueError(f'Invalid ramp angle (must be over 0 and at most {MAX_RAMP_ANGLE:g}°).')
+        name = ramp_src.get('angle')
+        if name:
+            a = round(a, 3)
+            writes.append((name, f'{_fmt(a)} deg', 'deg', a))
 
     p = item.get('pass') or 'rough'
     if p not in PASSES:
@@ -400,7 +412,7 @@ def tool_guid(tool_json: Optional[str]) -> Optional[str]:
     return str(g) if g else None
 
 
-_TOL = {'rpm': 0.5, 'feed': 0.5, 'len': 1e-4}
+_TOL = {'rpm': 0.5, 'feed': 0.5, 'len': 1e-4, 'deg': 1e-3}
 
 
 def write_matches(kind: str, target, expression, internal) -> bool:

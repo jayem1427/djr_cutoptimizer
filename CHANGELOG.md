@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.7.0 — 2026-11-27
+
+Lessons from a slow 3D adaptive (R2, a 3/8" 3-flute in 6061), where the helical ramp took 3.4 of the op's 5 minutes.
+
+**Ramp descent.** Results has a new *Ramp descent* row: how fast the helical ramp goes down (ramp feed × tan of the ramp angle), now and optimized. A ramp fed at 275 mm/min at 1.2° descends under 6 mm/min, which is easy to miss when you only look at the feed. The verdict says how many times faster the optimized ramp goes down.
+
+**Max ramp angle.** New limit under *More limits*, blank by default. Set it to the steepest helical ramp your tool maker allows (2–3° is common for aluminium end mills) and the panel tries every angle from the operation's own up to it, in 0.25° steps, and keeps the one that descends fastest inside your limits. Apply writes `rampAngle` along with the ramp feed. It never suggests a shallower angle than the operation has, and leaves the angle alone when Fusion has it greyed out.
+
+**The smallest helix is checked too.** Fusion shrinks the helix from *Helical ramp diameter* down to *Minimum ramp diameter* when there isn't room, and on a small helix the cutting edge on the wall moves much faster than the programmed feed (2.6× for a 6 mm helix with a 9.5 mm tool). The ramp feed is now worked out at both diameters and the slower one wins, so a cramped ramp can't overload the edge.
+
+**Max feed caps the ramp's programmed feed, not the edge's.** Max feed is what the axes can do, which is the tool-centre feed Fusion programs. The ramp used to cap the edge feed at Max feed, which on a small helix made the ramp feed two to three times slower than it needed to be.
+
+**Rubbing ramps are flagged.** If the current ramp's chip at the wall is under your Min chip, its *Helix ramp feed* turns red and the verdict says so.
+
+**Feed reached.** New limit under *More limits*, blank by default. Acceleration and jerk limits mean a machine rarely reaches the programmed feed on an adaptive path: every arc and direction change slows it, and the chip gets thinner there. Enter the share of the programmed feed your machine really reaches (for example 50 %) and the optimizer requires the min chip at that feed, so the cut doesn't rub where the machine slows down. The helical ramp is one smooth curve the machine holds at full feed, so it isn't affected.
+
 ## v0.6.0 — 2026-11-26
 
 **Tool presets.** A new *Tool preset* section under Results saves the optimized cut as a preset on the operation's tool: spindle speed, cutting feed, ramp spindle speed and ramp feed, stepover and stepdown. New operations with that tool can start from it. The name fills in from material and pass (for example "djr · Aluminium (wrought) · Rough") until you type your own, and saving under an existing name updates that preset. *Use it on this operation* (on by default) assigns it. *Also add it to my tool library* adds the same preset to that tool in your local and cloud tool libraries. The operation card now shows which preset an operation uses.

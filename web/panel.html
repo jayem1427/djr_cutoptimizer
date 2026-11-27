@@ -202,6 +202,8 @@ canvas{ display:block; width:100%; height:128px; }
           <div class="r"><label for="deflMax">Max deflection</label><div class="box"><input id="deflMax" class="num" inputmode="decimal"><span>mm</span></div></div>
           <div class="r"><label for="vcMin">Min surface speed</label><div class="box"><input id="vcMin" class="num" inputmode="decimal"><span>m/min</span></div></div>
           <div class="r"><label for="vcMax">Max surface speed</label><div class="box"><input id="vcMax" class="num" inputmode="decimal"><span>m/min</span></div></div>
+          <div class="r"><label for="feedReach" title="Share of the programmed feed your machine really reaches on adaptive paths. Acceleration and jerk limits slow every arc and direction change, and the chip gets thinner there. The min chip must still hold at this feed. Blank = the full feed is reached.">Feed reached</label><div class="box"><input id="feedReach" class="num" inputmode="decimal"><span>%</span></div></div>
+          <div class="r"><label for="rampMax" title="Steepest helical ramp angle you allow (check the tool maker's figure; 2–3° is common for aluminium). Steeper descends faster. Blank = keep each operation's ramp angle.">Max ramp angle</label><div class="box"><input id="rampMax" class="num" inputmode="decimal"><span>deg</span></div></div>
           <div class="r"><label for="helixDefault">Helix if unknown</label><div class="box"><input id="helixDefault" class="num" inputmode="decimal"><span>deg</span></div></div>
           <div class="r"><label for="pmax">Spindle power</label><div class="box"><input id="pmax" class="num" inputmode="decimal"><span>kW</span></div></div>
           <div class="r"><label for="tmax" title="Your spindle's rated torque. VFD spindles have constant torque up to their rated speed. Leave blank for no limit.">Max spindle torque</label><div class="box"><input id="tmax" class="num" inputmode="decimal"><span>N·m</span></div></div>
@@ -237,6 +239,7 @@ canvas{ display:block; width:100%; height:128px; }
             <tr><td>Force slope</td><td class="v num" id="c_s">–</td><td class="v num best" id="o_s">–</td><td class="u">N/deg<span class="bar"><i id="b_s"></i></span></td></tr>
             <tr><td>Deflection</td><td class="v num" id="c_d">–</td><td class="v num best" id="o_d">–</td><td class="u">mm<span class="bar"><i id="b_d"></i></span></td></tr>
             <tr id="rampRow" class="hidden"><td title="Feed along the helical ramp (entry). Modelled as a full-width slot as deep as one turn of the helix descends, inside the same limits.">Helix ramp feed</td><td class="v num" id="c_rf">–</td><td class="v num best" id="o_rf">–</td><td class="u">mm/min</td></tr>
+            <tr id="rampDescRow" class="hidden"><td title="How fast the helical ramp goes down: ramp feed × tan(ramp angle). A slow ramp is often the biggest time sink in a pocket.">Ramp descent</td><td class="v num" id="c_rd">–</td><td class="v num best" id="o_rd">–</td><td class="u">mm/min</td></tr>
           </tbody>
         </table>
         <p class="verdict" id="verdict"></p>
@@ -284,6 +287,7 @@ canvas{ display:block; width:100%; height:128px; }
 </div>
 
 <script src="optimizer.js"></script>
+<script src="ramp.js"></script>
 <script>
 /* Compact optimizer panel for the djr_cutoptimizer Fusion add-in. Metric throughout.
 
@@ -314,10 +318,10 @@ const MATERIALS = {
 };
 const E_CARBIDE = 600000;   // N/mm², solid carbide (same as the calculator)
 const DEFAULT_MAT = "Aluminium (wrought)";
-const VERSION = "0.6.0";
-const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","aePct","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","tmax","eta","deflFinish","clearance"];
+const VERSION = "0.7.0";
+const LIMIT_FIELDS = ["Fmax","slopeMax","hexMax","hmMin","nmax","aePct","vfmax","deflMax","vcMin","vcMax","helixDefault","pmax","tmax","eta","deflFinish","clearance","feedReach","rampMax"];
 const DEFAULT_LIMITS = { Fmax:30, slopeMax:2.5, hexMax:"", hmMin:"", nmax:24000, aePct:40, vfmax:"", deflMax:"", vcMin:"", vcMax:"", helixDefault:35, pmax:1.5, tmax:0.6, eta:0.8,
-  deflFinish:0.01, clearance:0.05 };
+  deflFinish:0.01, clearance:0.05, feedReach:"", rampMax:"" };
 const DEFAULT_CLEARANCE = 0.05;
 const WORKING = "__working";          // auto-saved working limits; hidden from the profile list
 const STEP = 0.1;
@@ -370,6 +374,8 @@ function moreSummary(){
   if(L.aePct > 0) parts.push(`stepover ≤ ${f(L.aePct,0)}%`);
   if(L.vfmax) parts.push(`feed ≤ ${f(L.vfmax,0)}`);
   if(L.deflMax) parts.push(`deflection ≤ ${g(L.deflMax,2)}`);
+  if(L.feedReach > 0 && L.feedReach < 100) parts.push(`feed reached ${f(L.feedReach,0)}%`);
+  if(L.rampMax > 0) parts.push(`ramp ≤ ${g(L.rampMax,2)}°`);
   if(L.usePow && L.pmax) parts.push(`${g(L.pmax,2)} kW`);
   if(L.tmax > 0) parts.push(`${g(L.tmax,2)} N·m`);
   $("moresum").textContent = "More limits" + (parts.length ? ` · ${parts.join(" · ")}` : "");
@@ -401,6 +407,8 @@ function effLimits(p, L){
   const a = chipAuto(p);
   const o = { nmax:L.nmax, Fmax:L.Fmax, slopeMax:L.slopeMax, vfmax:L.vfmax,
     hexMax: L.hexMax > 0 ? L.hexMax : a.hexMax, hmMin: L.hmMin > 0 ? L.hmMin : a.hmMin, vcMin:L.vcMin, vcMax:L.vcMax };
+  /* Feed reached: the min chip must hold at the feed the machine really gets to, not just the programmed one. */
+  o.hmMinBase = o.hmMin; o.hmMin = RampPlan.minChipAtFullFeed(o.hmMin, L.feedReach);
   if(L.usePow && L.pmax){ o.Pmax = L.pmax; o.eta = L.eta || 1; }
   if(L.tmax > 0){ o.Tmax = L.tmax; o.eta = L.eta || 1; }
   const dl = deflLimit(p, L);
@@ -528,28 +536,67 @@ function currentCut(p, L){
    full width, so it's modelled as a slot that deep, inside the same limits, at the cut's rpm.
    The ramp feed is the tool centre's: on a circle of diameter Dh the outer wall (Dh + D) moves
    faster, so the edge feed the model allows is scaled by Dh / (Dh + D). Never above the cutting feed.
-   Fusion's 2° and a helix as wide as the tool are assumed when the operation doesn't say. */
+   Fusion shrinks the helix down to minimumRampDiameter when there isn't room, so that diameter is
+   checked too and the slower feed wins (a 6 mm helix with a 9.5 mm tool has a 2.6× wall multiplier).
+   With Max ramp angle set, steeper angles up to it are tried and the fastest descent wins.
+   Fusion's 2° and a helix as wide as the tool are assumed when the operation doesn't say.
+   The helix is one smooth curve the machine holds at full feed, so Feed reached doesn't apply. */
 const RAMP_ANGLE_DEFAULT = 2;
 function rampGeom(p){
   const r = p.ramp || {}, D = p.tool.D;
   const angle = r.angle > 0 && r.angle < 45 ? r.angle : null, dia = r.dia > 0 ? r.dia : null;
-  return { angle: angle || RAMP_ANGLE_DEFAULT, dia: dia || D, assumedAngle: !angle, assumedDia: !dia };
+  const minDia = r.minDia > 0 && r.minDia < (dia || D) ? r.minDia : null;
+  return { angle: angle || RAMP_ANGLE_DEFAULT, dia: dia || D, minDia, assumedAngle: !angle, assumedDia: !dia };
+}
+function rampAt(t, Lo, dias, angle){
+  let out = null;
+  for(const dia of dias){
+    const pitch = RampPlan.pitch(dia, angle), k = RampPlan.helixK(dia, t.D);
+    /* Max feed is what the machine's axes can do: the centre feed. The edge may go 1/k faster. */
+    const Ld = Lo.vfmax > 0 ? Object.assign({}, Lo, { vfmax: Lo.vfmax / k }) : Lo;
+    let r;
+    try{ r = CutOpt.optimize(t, Ld, { aeLock: t.D, apLock: Math.max(pitch, 0.01) }); }
+    catch(e){ return { skip: "the ramp couldn’t be optimized" }; }
+    if(!r.ok) return { skip: r.reason };
+    const vf = r.best.vf * k;
+    if(!out || vf < out.vf) out = { vf, edge: r.best, pitch, k, dia };
+  }
+  return out;
 }
 function rampCut(p, L, best){
   if(!p.ramp || !p.rampSrc || !p.rampSrc.vf || isFinish(p) || p.kind === "slot" || !best) return null;
   const type = String(p.ramp.type || "").toLowerCase();
   if(type && !/heli/.test(type)) return { skip: `the ramp type is “${p.ramp.type}”; only helical ramps are modelled` };
-  const t = toolOf(p, L), gm = rampGeom(p);
-  const pitch = Math.PI * gm.dia * Math.tan(gm.angle * Math.PI / 180);
+  const t = toolOf(p, L), gm = rampGeom(p), dias = RampPlan.diameters(gm.dia, gm.minDia);
   const Lo = Object.assign({}, effLimits(p, L), { nmax: best.n });
-  let r;
-  try{ r = CutOpt.optimize(t, Lo, { aeLock: t.D, apLock: Math.max(pitch, 0.01) }); }
-  catch(e){ return { skip: "the ramp couldn’t be optimized" }; }
-  if(!r.ok) return { skip: r.reason };
-  const k = gm.dia / (gm.dia + t.D), vfEdge = r.best.vf;
-  const capped = vfEdge * k > best.vf;
-  return { vf: Math.min(vfEdge * k, best.vf), n: best.n, edge: r.best, pitch, gm, k,
-    bindLabel: capped ? "the cutting feed" : limitName(r.best.bind, Lo) };
+  Lo.hmMin = Lo.hmMinBase;
+  const canAngle = !!(p.rampSrc.angle && !gm.assumedAngle);
+  let skip = null;
+  const pick = RampPlan.chooseAngle(gm.angle, canAngle ? L.rampMax : null, a => {
+    const r = rampAt(t, Lo, dias, a);
+    if(!r || r.skip){ skip = skip || (r && r.skip); return null; }
+    return { vf: Math.min(r.vf, best.vf), raw: r };
+  });
+  if(!pick) return { skip: skip || "the ramp couldn’t be optimized" };
+  const r = pick.result.raw, capped = r.vf > best.vf;
+  return { vf: pick.vf, n: best.n, edge: r.edge, pitch: r.pitch, gm, k: r.k, dia: r.dia, angle: pick.angle,
+    angleChanged: Math.abs(pick.angle - gm.angle) > 1e-6, descent: pick.descent,
+    bindLabel: capped ? "the cutting feed" : limitName(r.edge.bind, Lo) };
+}
+/* The ramp as programmed now: how fast it descends and the chip at the wall (at the ramp's own rpm). */
+function currentRamp(p, L){
+  if(!p.ramp || !(p.ramp.vf > 0) || isFinish(p) || p.kind === "slot") return null;
+  const gm = rampGeom(p), t = toolOf(p, L), n = p.ramp.n > 0 ? p.ramp.n : p.op.n;
+  const out = { descent: RampPlan.descent(p.ramp.vf, gm.angle), angle: gm.angle };
+  const dia = gm.minDia || gm.dia, k = RampPlan.helixK(dia, t.D), fz = RampPlan.edgeFz(p.ramp.vf, n, t.z, k);
+  if(isFinite(fz)){
+    try{
+      const c = CutOpt.describe(CutOpt.normTool(t), n, t.D, Math.max(RampPlan.pitch(dia, gm.angle), 0.01), fz, STEP);
+      out.hm = c.hm; out.fz = fz; out.k = k; out.dia = dia;
+      out.rubbing = c.hm < effLimits(p, L).hmMinBase * 0.995;
+    }catch(e){}
+  }
+  return out;
 }
 
 function optimizeOp(p, L, bulk){
@@ -712,9 +759,15 @@ function renderOne(){
   const ids = ["c_n","c_vf","c_fz","c_q","c_p","c_t","c_f","c_s","c_d","o_n","o_vf","o_ae","o_ap","o_fz","o_q","o_p","o_t","o_f","o_s","o_d"];
   ids.forEach(i => $(i).textContent = "–"); $("gain").textContent = "";
   ["c_p","c_t","c_f","c_s","c_d"].forEach(i => { $(i).classList.remove("over"); $(i).title = ""; });
-  $("c_rf").textContent = "–"; $("o_rf").textContent = "–";
-  $("rampRow").classList.toggle("hidden", !(p && p.ok && p.rampSrc && p.rampSrc.vf && !isFinish(p) && p.kind !== "slot"));
+  ["c_rf","o_rf","c_rd","o_rd"].forEach(i => $(i).textContent = "–");
+  $("c_rf").classList.remove("over"); $("c_rf").title = "";
+  const showRamp = !!(p && p.ok && p.rampSrc && p.rampSrc.vf && !isFinish(p) && p.kind !== "slot");
+  $("rampRow").classList.toggle("hidden", !showRamp); $("rampDescRow").classList.toggle("hidden", !showRamp);
+  const cr = p && p.ok ? currentRamp(p, L) : null;
   if(p && p.ok && p.ramp && p.ramp.vf > 0) setCell("c_rf", f(p.ramp.vf, 0));
+  if(cr && isFinite(cr.descent)) setCell("c_rd", cr.descent, 2);
+  if(cr && cr.rubbing){ $("c_rf").classList.add("over");
+    $("c_rf").title = `Rubbing: the chip at the wall is ${g(cr.hm, 2)} mm, under your min chip. On a Ø ${g(cr.dia, 3)} mm helix the wall moves ${g(1 / cr.k, 2)}× the programmed feed.`; }
   const eta = L.eta > 0 && L.eta <= 1 ? L.eta : 1, kw = r => r && isFinite(r.Pc) ? r.Pc / eta : NaN; $("verdict").textContent = "";
   $("b_f").style.width = "0"; $("b_s").style.width = "0"; $("b_d").style.width = "0";
   if(!p || !p.ok){ $("c_ae").value = ""; $("c_ap").value = ""; drawCurve(null, null, L); return; }
@@ -754,13 +807,17 @@ function renderOne(){
       mark("c_s", L.slopeMax > 0 && cur.robustSlope > L.slopeMax * 1.005, "force slope");
       mark("c_d", dl > 0 && cur.defl > dl * 1.005, "deflection");
       if(over.length) v += ` The current cut is over your ${[...new Set(over)].join(", ")} limit.`;
+      if(cr && cr.rubbing) v += ` The current ramp rubs: ${g(cr.hm,2)} mm chip at the wall.`;
     } else v += " Couldn’t read the current cut fully, so there’s nothing to compare.";
     if(!(L.vfmax > 0) && b.ae <= 0.021 * p.tool.D) v += ` Stepover is at its 2% floor with a ${f(b.vf,0)} mm/min feed: set <b>Max feed</b> (More limits) to what your machine can really do.`;
     const rp = R.ramp;
     if(rp && rp.vf > 0){
-      setCell("o_rf", f(rp.vf, 0));
+      setCell("o_rf", f(rp.vf, 0)); if(isFinite(rp.descent)) setCell("o_rd", rp.descent, 2);
       const as = [rp.gm.assumedAngle && `${g(rp.gm.angle,2)}°`, rp.gm.assumedDia && `Ø ${g(rp.gm.dia,3)} mm`].filter(Boolean);
-      v += ` Helix ramp: ${g(rp.gm.angle,2)}° on Ø ${g(rp.gm.dia,3)} mm descends ${g(rp.pitch,2)} mm a turn, fed as a slot that deep; limited by <b>${esc(rp.bindLabel)}</b>.`;
+      v += ` Helix ramp: ${g(rp.angle,2)}° on Ø ${g(rp.dia,3)} mm descends ${g(rp.pitch,2)} mm a turn, fed as a slot that deep; limited by <b>${esc(rp.bindLabel)}</b>.`;
+      if(rp.angleChanged) v += ` Ramp angle ${g(rp.gm.angle,2)}° → <b>${g(rp.angle,2)}°</b> (your Max ramp angle allows it, and it goes down faster).`;
+      if(rp.gm.minDia && rp.dia === rp.gm.minDia) v += ` Checked at the Ø ${g(rp.gm.minDia,3)} mm minimum helix Fusion may shrink to.`;
+      if(cr && cr.descent > 0 && rp.descent > cr.descent * 1.05) v += ` The ramp goes down ${f(rp.descent / cr.descent, 1)}× faster.`;
       if(as.length) v += ` (${as.join(" and ")} assumed: the operation didn’t say.)`;
     } else if(rp && rp.skip) v += ` Ramp feed left alone: ${esc(rp.skip)}.`;
     if(helixFor(p, L).assumed && L.slopeMax) v += " Helix is assumed; check it for the slope limit.";
@@ -828,6 +885,7 @@ function pending(p){
   const rr = p.ramp || {};
   if(it.rampVf !== undefined && !same(Math.floor(it.rampVf), rr.vf, 0.5)) return true;
   if(it.rampN !== undefined && !same(Math.floor(it.rampN), rr.n, 0.5)) return true;
+  if(it.rampAngle !== undefined && !same(Math.round(it.rampAngle * 1e3) / 1e3, rr.angle, 1e-3)) return true;
   if(it.pass !== "rough"){
     const c = clearanceOf(readLimits()), want = it.pass === "wall" ? [0, c] : [c, 0], s = p.stock || {};
     if(!same(want[0], s.radial, 1e-4) || !same(want[1], s.axial, 1e-4)) return true;
@@ -838,7 +896,8 @@ function applyTargets(){ return optimizedOps().filter(pending); }
 function applyItem(p){
   const b = results[opKey(p)].opt.best, ps = passFor(p), it = { id:opKey(p), n:b.n, vf:b.vf, pass:ps };
   const rp = results[opKey(p)].ramp;
-  if(ps === "rough" && rp && rp.vf > 0){ it.rampVf = rp.vf; if(p.rampSrc && p.rampSrc.n) it.rampN = rp.n; }
+  if(ps === "rough" && rp && rp.vf > 0){ it.rampVf = rp.vf; if(p.rampSrc && p.rampSrc.n) it.rampN = rp.n;
+    if(rp.angleChanged && p.rampSrc && p.rampSrc.angle) it.rampAngle = rp.angle; }
   if(ps === "rough"){
     const k = keeps(p), o = geomOverride(p);
     if(p.kind !== "slot"){ if(!k.ae) it.ae = b.ae; else if(isFinite(o.ae)) it.ae = o.ae; }

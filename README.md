@@ -64,7 +64,7 @@ The operation card shows which preset an operation uses.
 - Spindle speed and cutting feed, rounded down to whole rpm and mm/min.
 - For rough passes, stepover/stepdown when you let the optimizer change them or typed them under *Current*.
 - For finish passes, the stock-to-leave checkbox and the radial and axial stock.
-- On roughing passes with a helical ramp: the ramp feed and ramp spindle speed (see *Helix ramp* below).
+- On roughing passes with a helical ramp: the ramp feed and ramp spindle speed, and the ramp angle when you set *Max ramp angle* (see *Helix ramp* below).
 - Not plunge, lead-in/out or other feeds.
 
 Every value is read back after it's written. If Fusion refuses one, or it reads back differently, that operation goes back exactly as it was and the panel says why; the rest still apply. An operation is never half-changed.
@@ -85,6 +85,8 @@ A gain below ×1 is shown in amber. It means the current cut is over your limits
 | Max spindle torque | 0.6 N·m | Motor torque the spindle can deliver (cutting torque ÷ efficiency). A VFD spindle has constant torque up to rated speed, so this is the real ceiling whenever a cut runs below max rpm. Blank turns it off. |
 | Max feed | none | **Set this** to what your machine can really do. With thin stepovers the model allows very high feeds, and the panel warns you when that happens. |
 | Max deflection | none | Tool deflection at the peak force (see below). |
+| Feed reached | none | Share of the programmed feed your machine really reaches on adaptive paths (acceleration and jerk slow every arc). The min chip must hold at that feed, so the cut doesn't rub where the machine slows down. Blank = full feed. |
+| Max ramp angle | none | Steepest helical ramp angle you allow (check your tool maker; 2–3° is common in aluminium). The panel tries steeper angles up to it and keeps the fastest descent. Blank keeps each operation's angle. |
 | Finish deflection | 0.01 mm | Deflection limit for wall and floor finish passes (the tighter of this and Max deflection wins). |
 | Finish clearance | 0.05 mm | Stock a wall finish leaves on the floor, and a floor finish leaves on the walls. |
 
@@ -139,7 +141,7 @@ The model is Sandvik Coromant's specific-cutting-force model, shared with [djr_c
 3. refines around the best point and re-checks it on a 0.05° force curve;
 4. snaps the depth just under a whole multiple of the flute pitch πD/(z·tan β) when that's within 1% of the best. Force is nearly constant there, but only *just under*: go even 0.02 mm deeper and the full slope comes back.
 
-**Helix ramp.** Adaptives and pockets enter with a helical ramp at their own feed, often a slow tool-library default. Each turn of the helix (diameter Ø<sub>h</sub>, angle α) descends p = π·Ø<sub>h</sub>·tan α, and the tool cuts full width, so the ramp is optimized as a slot of depth p under the same limits at the cutting rpm. That gives the feed at the cutting edge. On a circle the outer wall (Ø<sub>h</sub> + D) moves faster than the tool centre, which is what Fusion's feed is, so the ramp feed is that × Ø<sub>h</sub> ÷ (Ø<sub>h</sub> + D), and never above the cutting feed. If the angle or diameter can't be read, 2° and Ø<sub>h</sub> = D are assumed and the panel says so. The end-cutting load on the tool's bottom edges isn't modelled; at a 2° ramp it's tiny.
+**Helix ramp.** Adaptives and pockets enter with a helical ramp at their own feed, often a slow tool-library default. Each turn of the helix (diameter Ø<sub>h</sub>, angle α) descends p = π·Ø<sub>h</sub>·tan α, and the tool cuts full width, so the ramp is optimized as a slot of depth p under the same limits at the cutting rpm. That gives the feed at the cutting edge. On a circle the outer wall (Ø<sub>h</sub> + D) moves faster than the tool centre, which is what Fusion's feed is, so the ramp feed is that × Ø<sub>h</sub> ÷ (Ø<sub>h</sub> + D), and never above the cutting feed. Max feed caps that centre feed. Fusion shrinks the helix down to *Minimum ramp diameter* when there isn't room, so the feed is worked out at both diameters and the slower one wins. With *Max ramp angle* set, angles from the operation's own up to it are tried in 0.25° steps and the fastest descent (feed × tan α, shown as *Ramp descent*) wins. A current ramp whose wall chip is under Min chip is shown in red. If the angle or diameter can't be read, 2° and Ø<sub>h</sub> = D are assumed and the panel says so. The end-cutting load on the tool's bottom edges isn't modelled; at a 2° ramp it's tiny.
 
 ## Known limitations
 

@@ -29,6 +29,7 @@ commands/optimizer/
 web/panel.html       the compact panel the palette opens (owned here). Holds the material table
                      (kc1, mc, chip limits), deflection, per-op-type defaults and the bulk view.
 web/optimizer.js     the model (copied from cutcalculator; see above)
+web/ramp.js          PURE helical-ramp helpers (RampPlan), owned here
 docs/images/         README renderings of panel.html (headless Chrome, fake bridge, sample ops)
 scripts/djr_dump_cam_params/  Fusion script that dumps every op/tool parameter
 tools/               build_release.py, release_intro.md + release_install.md (release notes), sync_web.py
@@ -39,10 +40,11 @@ tests/               test_addin.py (stdlib unittest with a fake adsk), web_optim
 
 - JS → Python: `adsk.fusionSendData(action, json)` → `palette.incomingFromHTML`; the handler sets `args.returnData`, which the JS receives as a Promise result.
 - Python → JS: `palette.sendInfoToHTML(action, json)` → `window.fusionJavaScriptHandler.handle(action, data)`.
-- Actions from the page: `ready`/`readOps` (every selected op; setups, folders and patterns expand), `getLimits`, `saveLimits`, `setMaterial` (`{material, setups}`), `apply` (`{items:[{id, n, vf, pass, ae?, ap?, rampVf?, rampN?}], clearance}`), `revert`, `savePreset` (`{id, name, values:{n, vf, rampN?, rampVf?, ae?, ap?}, assign, library}`). To the page: `selectionChanged` (pushed from `ui.activeSelectionChanged` while the palette is visible; an empty selection is ignored), `fusionStatus`.
-- Each op payload carries `src` (the parameter each of n/vf/ae/ap was read from; `ae` is null for slots), `stock` ({radial, axial} mm), `stockSrc` ({radial, axial, flag}), `ramp` ({vf, n, angle, dia, type}) and `rampSrc` ({vf, n}). Apply writes back to exactly those names.
+- Actions from the page: `ready`/`readOps` (every selected op; setups, folders and patterns expand), `getLimits`, `saveLimits`, `setMaterial` (`{material, setups}`), `apply` (`{items:[{id, n, vf, pass, ae?, ap?, rampVf?, rampN?, rampAngle?}], clearance}`), `revert`, `savePreset` (`{id, name, values:{n, vf, rampN?, rampVf?, ae?, ap?}, assign, library}`). To the page: `selectionChanged` (pushed from `ui.activeSelectionChanged` while the palette is visible; an empty selection is ignored), `fusionStatus`.
+- Each op payload carries `src` (the parameter each of n/vf/ae/ap was read from; `ae` is null for slots), `stock` ({radial, axial} mm), `stockSrc` ({radial, axial, flag}), `ramp` ({vf, n, angle, dia, minDia, type}) and `rampSrc` ({vf, n, angle}; angle is null when greyed out). Apply writes back to exactly those names.
 - **Stepover caps:** `op.aeMax` (adaptives) = Fusion's limit, optimal load + load deviation ≤ 99 % of D (`max_optimal_load`; 0.2·D deviation assumed if unreadable). The panel's optimizer gets min(D, Max stepover % × D, aeMax), and `plan_writes` refuses an optimal load over aeMax.
-- **Helix ramp** (`rampCut` in panel.html): a slot of depth π·Dh·tan(angle) at the cut's rpm under the same limits; centre feed = edge feed × Dh/(Dh+D), capped at the cutting feed. 2° and Dh = D assumed when unread; non-helical `rampType` is skipped. Rough passes only.
+- **Helix ramp** (`rampCut` in panel.html): a slot of depth π·Dh·tan(angle) at the cut's rpm under the same limits; centre feed = edge feed × Dh/(Dh+D), capped at the cutting feed; Max feed caps the centre feed. Checked at `helicalRampDiameter` and `minimumRampDiameter` (Fusion shrinks to it when cramped), slower wins. With *Max ramp angle* (`rampMax`), angles from the op's up to it are tried and the fastest descent (vf·tan α) wins; Apply writes `rampAngle`. The pure math is in `web/ramp.js` (`RampPlan`, owned here, Node-tested in `tests/web_ramp.test.js`). 2° and Dh = D assumed when unread; non-helical `rampType` is skipped. Rough passes only.
+- **Feed reached** (`feedReach`, %): `effLimits` raises hmMin to hmMin·100/pct so the min chip holds where the planner slows down; `hmMinBase` keeps the raw value for the ramp.
 - **Tool presets** (`save_preset`): finds the op's tool in `cam.documentToolLibrary` by `toJson()` guid (else `op.tool`), `tool.presets.itemsByName(name)` (case-insensitive) or `presets.add()`, writes `cam_mapping.preset_writes` (preset params `tool_spindleSpeed`, `tool_feedCutting`, `tool_rampSpindleSpeed`, `tool_feedRamp`, `tool_stepover`, `tool_stepdown`), commits with `documentToolLibrary.update(tool)`, then optionally `op.toolPreset = …` and, for `library`, the same preset on the guid-matched tool in local and cloud libraries via `CAMManager.get().libraryManager.toolLibraries` + `updateToolLibrary(url, lib)`. All from Autodesk's API reference; **not yet run in Fusion**. Each op payload carries `preset` (the op's preset name).
 - **Apply state:** `pending(p)` compares what Apply would write (rounded as Python writes it, plus finish stock and ramp) with what Fusion holds; Apply is disabled when nothing differs.
 - **Apply** (`OptimizerCommand.apply`): re-reads each op, calls the pure `cam_mapping.plan_writes`, writes each parameter by expression (a boolean flag by `value.value`), and reads it back with `write_matches`. Any failure restores that op from its snapshot. Changed ops regenerate in one `cam.generateToolpath(ObjectCollection)`. The snapshots of the last apply are kept in memory for `revert`; they're lost when the add-in stops.
@@ -57,7 +59,7 @@ tests/               test_addin.py (stdlib unittest with a fake adsk), web_optim
 
 ```bash
 python -m pytest                        # or: python -m unittest discover -s tests -v
-node --test tests/web_optimizer.test.js
+node --test tests/web_optimizer.test.js tests/web_ramp.test.js
 python tools/build_release.py --check
 python tools/sync_web.py --check        # only with ../cutcalculator checked out
 ```
